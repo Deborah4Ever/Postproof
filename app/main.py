@@ -82,7 +82,15 @@ def check_job(req: CheckJobRequest, request: Request, response: Response):
             return _trial_exhausted_response(used)
 
     if req.url:
-        posting = extract_posting_from_url(req.url, user_key=user_key)
+        try:
+            posting = extract_posting_from_url(req.url, user_key=user_key)
+        except Exception as e:
+            # extract_posting_from_url calls Monid (which already logs its
+            # own cost unconditionally) and then Claude to parse the page -
+            # an uncaught error in that second step must NEVER escape as a
+            # bare 500 after the Monid spend already happened. Same
+            # never-let-it-500-silently rule as check_one_posting below.
+            raise HTTPException(status_code=502, detail=f"URL extraction failed: {e}")
         if posting.get("failed"):
             raise HTTPException(
                 status_code=422,

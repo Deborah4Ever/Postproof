@@ -44,11 +44,23 @@ def extract_posting_fields(page_content: str, url: str) -> dict | None:
     """
     prompt = EXTRACT_FIELDS_PROMPT.format(url=url, content=page_content[:8000])
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except anthropic.APIError:
+        # Docstring promise is "never raises" - an Anthropic-side error
+        # (rate limit, overload, timeout) is exactly the kind of "model
+        # response couldn't be parsed" case this already returns None for.
+        return None
+
+    if not response.content:
+        # Empty content block (e.g. a refusal with no text) used to raise
+        # IndexError here and crash the request AFTER the Monid fetch had
+        # already spent real money - same "never raises" contract applies.
+        return None
 
     text = response.content[0].text.strip()
     if text.startswith("```"):
