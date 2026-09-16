@@ -4,123 +4,173 @@
 <meta charset="utf-8" />
 <title>Postproof</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --bg: #0b0c0f;
+    --card-bg: #15171c;
+    --card-border: #23252b;
+    --input-bg: #0f1014;
+    --input-border: #2a2d35;
+    --text: #e8e8ea;
+    --text-muted: #9ca3af;
+    --text-quiet: #6b7280;
+    --accent: #4ade80;
+    --accent-ink: #06240f;
+
+    /* Status washes: pale tinted background + a muted (not neon) shade of
+       the same hue for text, so nothing reads as a saturated fill. */
+    --real-bg: rgba(74, 222, 128, 0.10);
+    --real-text: #7fd99a;
+    --real-dot: #4ade80;
+    --suspicious-bg: rgba(217, 181, 98, 0.12);
+    --suspicious-text: #d9b562;
+    --suspicious-dot: #eab308;
+    --ghost-bg: rgba(240, 128, 128, 0.10);
+    --ghost-text: #e08585;
+    --ghost-dot: #f87171;
+  }
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    max-width: 900px; margin: 40px auto; padding: 0 16px 60px;
-    background: #0b0c0f; color: #e8e8ea;
+    max-width: 720px; margin: 48px auto; padding: 0 16px 60px;
+    background: var(--bg); color: var(--text);
   }
-  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 20px; }
 
-  /* --- check form --- */
+  /* Title reads as a quiet wordmark, not a headline - the cost number
+     below is the thing your eye should land on. */
+  h1 {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-quiet); margin: 0 0 32px;
+  }
+
+  .zone { margin-bottom: 48px; }
+  .zone:last-child { margin-bottom: 0; }
+
+  .section-label {
+    color: var(--text-quiet); font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 10px;
+  }
+
+  /* --- check form: a distinctly raised card, separated from the page --- */
   .check-form {
-    background: #15171c; border: 1px solid #23252b; border-radius: 14px;
-    padding: 20px; margin-bottom: 28px;
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px;
+    padding: 24px; margin-bottom: 14px;
   }
   .check-form input {
-    width: 100%; background: #0f1014; border: 1px solid #2a2d35; color: #e8e8ea;
+    width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text);
     border-radius: 8px; padding: 12px 14px; font-size: 15px; font-family: inherit;
   }
-  .check-form input::placeholder { color: #6b7280; }
+  .check-form input::placeholder { color: var(--text-quiet); }
   #url-input { margin-bottom: 12px; }
   .fields-row { display: flex; gap: 10px; margin-bottom: 14px; }
   .fields-row input { font-size: 13px; padding: 9px 12px; }
   .check-form button {
-    background: #4ade80; color: #06240f; border: none; border-radius: 8px;
+    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
     padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
   }
   .check-form button:disabled { opacity: 0.6; cursor: default; }
   .form-error {
-    margin-top: 12px; color: #f87171; font-size: 13px; background: rgba(248,113,113,0.1);
-    border: 1px solid rgba(248,113,113,0.25); border-radius: 8px; padding: 10px 12px;
+    margin-top: 12px; color: var(--ghost-text); font-size: 13px; background: var(--ghost-bg);
+    border: 1px solid rgba(240,128,128,0.3); border-radius: 8px; padding: 10px 12px;
   }
 
   /* --- trial counter + key gate --- */
-  .trial-counter {
-    color: #9ca3af; font-size: 12px; margin: 10px 0 20px;
-  }
+  .trial-counter { color: var(--text-quiet); font-size: 12px; }
   .trial-gate {
-    margin-top: 12px; background: rgba(250,204,21,0.08);
-    border: 1px solid rgba(250,204,21,0.3); border-radius: 8px; padding: 14px;
+    margin-top: 12px; background: var(--suspicious-bg);
+    border: 1px solid rgba(217,181,98,0.3); border-radius: 8px; padding: 14px;
   }
-  .trial-gate-msg { color: #facc15; font-size: 13px; margin-bottom: 10px; }
-  .trial-gate input {
-    margin-bottom: 10px;
-  }
+  .trial-gate-msg { color: var(--suspicious-text); font-size: 13px; margin-bottom: 10px; }
+  .trial-gate input { margin-bottom: 10px; }
   .trial-gate button {
-    background: #facc15; color: #241d02; border: none; border-radius: 8px;
+    background: var(--suspicious-dot); color: #241d02; border: none; border-radius: 8px;
     padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
   }
   .trial-gate button:disabled { opacity: 0.6; cursor: default; }
 
-  /* --- cost counter --- */
+  /* --- cost number: the single largest, boldest element on the page --- */
   .cost-label {
-    color: #9ca3af; font-size: 12px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.06em; margin-bottom: 2px;
+    color: var(--text-quiet); font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 6px;
   }
   .cost {
-    font-size: 56px; font-weight: 800; color: #4ade80; letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums; margin: 2px 0 28px;
+    font-size: 40px; font-weight: 500; color: var(--accent); letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* --- results table --- */
-  table { border-collapse: separate; border-spacing: 0 10px; width: 100%; }
-  thead th {
-    text-align: left; padding: 0 14px 6px; font-size: 11px; text-transform: uppercase;
-    letter-spacing: 0.05em; color: #6b7280; font-weight: 600;
+  /* --- results: one compact row per posting, detail on demand --- */
+  .results-list { display: flex; flex-direction: column; gap: 10px; }
+  .results-empty { color: var(--text-quiet); font-size: 13px; }
+
+  .result-row {
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 14px 16px;
   }
-  tbody tr { background: #15171c; }
-  tbody td { padding: 16px 14px; border: none; font-size: 14px; vertical-align: top; }
-  tbody tr td:first-child { border-radius: 10px 0 0 10px; }
-  tbody tr td:last-child { border-radius: 0 10px 10px 0; }
-  td.title-cell { font-weight: 600; }
-  td.company-cell { color: #9ca3af; }
+  .result-main { display: flex; align-items: flex-start; gap: 12px; }
+  .result-body { flex: 1 1 auto; min-width: 0; }
+  .result-title { font-weight: 600; font-size: 14px; }
+  .result-company { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
+  .result-summary { font-size: 12px; color: var(--text-quiet); margin-top: 6px; line-height: 1.4; }
+
+  .result-toggle {
+    flex: 0 0 auto; background: none; border: none; color: var(--text-quiet);
+    font-size: 12px; cursor: pointer; padding: 2px 4px; font-family: inherit;
+  }
+  .result-toggle:hover { color: var(--text-muted); }
+
+  .result-details {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border);
+  }
+  .result-details[hidden] { display: none; }
+  .evidence { margin: 0; padding-left: 18px; }
+  .evidence li { margin-bottom: 4px; line-height: 1.4; color: #c7c9cf; font-size: 13px; }
+  .evidence li:last-child { margin-bottom: 0; }
+  .detail-contact { margin-top: 8px; font-size: 12px; color: var(--text-quiet); }
 
   .badge {
-    display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
     border-radius: 999px; font-weight: 600; font-size: 12px; white-space: nowrap;
+    margin-top: 1px;
   }
-  .badge.real { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
-  .badge.suspicious { background: rgba(250, 204, 21, 0.15); color: #facc15; }
-  .badge.ghost { background: rgba(248, 113, 113, 0.15); color: #f87171; }
-
-  .evidence { margin: 0; padding-left: 18px; }
-  .evidence li { margin-bottom: 4px; line-height: 1.4; color: #c7c9cf; }
-
-  .row-cost { margin-top: 6px; font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
-  .evidence li:last-child { margin-bottom: 0; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+  .badge.real { background: var(--real-bg); color: var(--real-text); }
+  .badge.real .dot { background: var(--real-dot); }
+  .badge.suspicious { background: var(--suspicious-bg); color: var(--suspicious-text); }
+  .badge.suspicious .dot { background: var(--suspicious-dot); }
+  .badge.ghost { background: var(--ghost-bg); color: var(--ghost-text); }
+  .badge.ghost .dot { background: var(--ghost-dot); }
 </style>
 </head>
 <body>
   <h1>Postproof</h1>
 
-  <div class="check-form">
-    <input id="url-input" type="text" placeholder="Paste a job posting URL, or enter title + company below" />
-    <div class="fields-row">
-      <input id="company-input" type="text" placeholder="Company" />
-      <input id="title-input" type="text" placeholder="Title" />
+  <div class="zone">
+    <div class="check-form">
+      <input id="url-input" type="text" placeholder="Paste a job posting URL, or enter title + company below" />
+      <div class="fields-row">
+        <input id="company-input" type="text" placeholder="Company" />
+        <input id="title-input" type="text" placeholder="Title" />
+      </div>
+      <button id="check-btn">Check this posting</button>
+      <div id="form-error" class="form-error" hidden></div>
+      <div id="trial-gate" class="trial-gate" hidden>
+        <div class="trial-gate-msg" id="trial-gate-msg">Free trial used up (2 checks) - connect your own Monid key to continue</div>
+        <input id="user-key-input" type="password" placeholder="Connect your Monid API key to continue" />
+        <button id="continue-key-btn">Continue with my key</button>
+      </div>
     </div>
-    <button id="check-btn">Check this posting</button>
-    <div id="form-error" class="form-error" hidden></div>
-    <div id="trial-gate" class="trial-gate" hidden>
-      <div class="trial-gate-msg" id="trial-gate-msg">Free trial used up (2 checks) - connect your own Monid key to continue</div>
-      <input id="user-key-input" type="password" placeholder="Connect your Monid API key to continue" />
-      <button id="continue-key-btn">Continue with my key</button>
-    </div>
+    <div class="trial-counter" id="trial-counter"></div>
   </div>
 
-  <div class="trial-counter" id="trial-counter"></div>
+  <div class="zone">
+    <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
+    <div class="cost" id="cost">$0.0000</div>
+  </div>
 
-  <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
-  <div class="cost" id="cost">$0.0000</div>
-
-  <table>
-    <thead>
-      <tr><th>Verdict</th><th>Title</th><th>Company</th><th>Evidence</th><th>Contact</th></tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
+  <div class="zone">
+    <div class="section-label">Recent checks</div>
+    <div class="results-list" id="rows"></div>
+  </div>
 
 <script>
 function escapeHtml(str) {
@@ -140,6 +190,34 @@ function extractErrorMessage(data) {
   return 'Something went wrong.';
 }
 
+function truncate(str, maxLen) {
+  if (!str) return '';
+  const s = String(str);
+  if (s.length <= maxLen) return s;
+  const cut = s.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd() + '…';
+}
+
+function summaryLine(r) {
+  const bits = (r.evidence || []).slice(0, 2).map(e => truncate(e, 60));
+  if (typeof r.check_cost_usd === 'number') {
+    bits.push(`cost $${r.check_cost_usd.toFixed(4)}`);
+  }
+  return bits.join(' · ');
+}
+
+function capitalize(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Rows are rebuilt from scratch every poll, so track which ones the user
+// has expanded (by stable index into the underlying /results array) and
+// restore that state - otherwise an open detail panel would slam shut
+// every 4 seconds mid-read.
+const expandedRows = new Set();
+
 async function refresh() {
   const cost = await (await fetch('/cost')).json();
   document.getElementById('cost').textContent = '$' + cost.total_measured_cost_usd.toFixed(4);
@@ -147,23 +225,54 @@ async function refresh() {
   const results = await (await fetch('/results')).json();
   const rows = document.getElementById('rows');
   rows.innerHTML = '';
-  for (const r of results.reverse()) {
-    const tr = document.createElement('tr');
-    const icon = r.verdict === 'real' ? '✅' : r.verdict === 'suspicious' ? '⚠️' : '❌';
+
+  if (results.length === 0) {
+    rows.innerHTML = '<div class="results-empty">No checks yet.</div>';
+    return;
+  }
+
+  const indexed = results.map((r, i) => ({ r, i }));
+  indexed.reverse();
+
+  for (const { r, i } of indexed) {
+    const key = String(i);
+    const isOpen = expandedRows.has(key);
+    const confidence = typeof r.confidence === 'number' ? ` · ${r.confidence.toFixed(2)}` : '';
     const evidenceItems = (r.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
-    tr.innerHTML = `
-      <td><span class="badge ${r.verdict}">${icon} ${escapeHtml(r.verdict)}</span></td>
-      <td class="title-cell">${escapeHtml(r.title)}</td>
-      <td class="company-cell">${escapeHtml(r.company)}</td>
-      <td><ul class="evidence">${evidenceItems}</ul></td>
-      <td>
-        ${r.contact ? '✓ found' : '—'}
-        ${typeof r.check_cost_usd === 'number' ? `<div class="row-cost">Cost: $${r.check_cost_usd.toFixed(4)}</div>` : ''}
-      </td>
+
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    row.innerHTML = `
+      <div class="result-main">
+        <span class="badge ${r.verdict}"><span class="dot"></span>${capitalize(escapeHtml(r.verdict))}${confidence}</span>
+        <div class="result-body">
+          <div class="result-title">${escapeHtml(r.title)}</div>
+          <div class="result-company">${escapeHtml(r.company)}</div>
+          <div class="result-summary">${escapeHtml(summaryLine(r))}</div>
+        </div>
+        <button class="result-toggle" data-key="${key}" aria-expanded="${isOpen}">${isOpen ? 'Hide details' : 'Details'}</button>
+      </div>
+      <div class="result-details" ${isOpen ? '' : 'hidden'}>
+        <ul class="evidence">${evidenceItems}</ul>
+        <div class="detail-contact">${r.contact ? 'Contact found' : 'No contact found'}</div>
+      </div>
     `;
-    rows.appendChild(tr);
+    rows.appendChild(row);
   }
 }
+
+document.getElementById('rows').addEventListener('click', (e) => {
+  const btn = e.target.closest('.result-toggle');
+  if (!btn) return;
+  const row = btn.closest('.result-row');
+  const details = row.querySelector('.result-details');
+  const key = btn.dataset.key;
+  const willOpen = details.hidden;
+  details.hidden = !willOpen;
+  btn.setAttribute('aria-expanded', String(willOpen));
+  btn.textContent = willOpen ? 'Hide details' : 'Details';
+  if (willOpen) expandedRows.add(key); else expandedRows.delete(key);
+});
 
 const urlInput = document.getElementById('url-input');
 const companyInput = document.getElementById('company-input');
@@ -214,31 +323,6 @@ function showTrialGate(message) {
 function hideTrialGate() {
   trialGate.hidden = true;
   checkBtn.hidden = false;
-}
-
-async function refresh() {
-  const cost = await (await fetch('/cost')).json();
-  document.getElementById('cost').textContent = '$' + cost.total_measured_cost_usd.toFixed(4);
-
-  const results = await (await fetch('/results')).json();
-  const rows = document.getElementById('rows');
-  rows.innerHTML = '';
-  for (const r of results.reverse()) {
-    const tr = document.createElement('tr');
-    const icon = r.verdict === 'real' ? '✅' : r.verdict === 'suspicious' ? '⚠️' : '❌';
-    const evidenceItems = (r.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
-    tr.innerHTML = `
-      <td><span class="badge ${r.verdict}">${icon} ${escapeHtml(r.verdict)}</span></td>
-      <td class="title-cell">${escapeHtml(r.title)}</td>
-      <td class="company-cell">${escapeHtml(r.company)}</td>
-      <td><ul class="evidence">${evidenceItems}</ul></td>
-      <td>
-        ${r.contact ? '✓ found' : '—'}
-        ${typeof r.check_cost_usd === 'number' ? `<div class="row-cost">Cost: $${r.check_cost_usd.toFixed(4)}</div>` : ''}
-      </td>
-    `;
-    rows.appendChild(tr);
-  }
 }
 
 async function submitCheck(payload) {
