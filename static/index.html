@@ -4,21 +4,92 @@
 <meta charset="utf-8" />
 <title>Postproof</title>
 <style>
-  body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; background: #0b0c0f; color: #e8e8ea; }
-  h1 { font-size: 20px; }
-  .cost { font-size: 32px; font-weight: 700; color: #4ade80; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #23252b; font-size: 14px; }
-  .real { color: #4ade80; }
-  .suspicious { color: #facc15; }
-  .ghost { color: #f87171; }
-  .badge { font-weight: 600; }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    max-width: 900px; margin: 40px auto; padding: 0 16px 60px;
+    background: #0b0c0f; color: #e8e8ea;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 20px; }
+
+  /* --- check form --- */
+  .check-form {
+    background: #15171c; border: 1px solid #23252b; border-radius: 14px;
+    padding: 20px; margin-bottom: 28px;
+  }
+  .check-form input {
+    width: 100%; background: #0f1014; border: 1px solid #2a2d35; color: #e8e8ea;
+    border-radius: 8px; padding: 12px 14px; font-size: 15px; font-family: inherit;
+  }
+  .check-form input::placeholder { color: #6b7280; }
+  #url-input { margin-bottom: 12px; }
+  .fields-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .fields-row input { font-size: 13px; padding: 9px 12px; }
+  .check-form button {
+    background: #4ade80; color: #06240f; border: none; border-radius: 8px;
+    padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .check-form button:disabled { opacity: 0.6; cursor: default; }
+  .form-error {
+    margin-top: 12px; color: #f87171; font-size: 13px; background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.25); border-radius: 8px; padding: 10px 12px;
+  }
+
+  /* --- cost counter --- */
+  .cost-label {
+    color: #9ca3af; font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 2px;
+  }
+  .cost {
+    font-size: 56px; font-weight: 800; color: #4ade80; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; margin: 2px 0 28px;
+  }
+
+  /* --- results table --- */
+  table { border-collapse: separate; border-spacing: 0 10px; width: 100%; }
+  thead th {
+    text-align: left; padding: 0 14px 6px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #6b7280; font-weight: 600;
+  }
+  tbody tr { background: #15171c; }
+  tbody td { padding: 16px 14px; border: none; font-size: 14px; vertical-align: top; }
+  tbody tr td:first-child { border-radius: 10px 0 0 10px; }
+  tbody tr td:last-child { border-radius: 0 10px 10px 0; }
+  td.title-cell { font-weight: 600; }
+  td.company-cell { color: #9ca3af; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+    border-radius: 999px; font-weight: 600; font-size: 12px; white-space: nowrap;
+  }
+  .badge.real { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+  .badge.suspicious { background: rgba(250, 204, 21, 0.15); color: #facc15; }
+  .badge.ghost { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+
+  .evidence { margin: 0; padding-left: 18px; }
+  .evidence li { margin-bottom: 4px; line-height: 1.4; color: #c7c9cf; }
+
+  .row-cost { margin-top: 6px; font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+  .evidence li:last-child { margin-bottom: 0; }
 </style>
 </head>
 <body>
   <h1>Postproof</h1>
-  <div>Real Monid spend so far (measured, not estimated):</div>
+
+  <div class="check-form">
+    <input id="url-input" type="text" placeholder="Paste a job posting URL, or enter title + company below" />
+    <div class="fields-row">
+      <input id="company-input" type="text" placeholder="Company" />
+      <input id="title-input" type="text" placeholder="Title" />
+    </div>
+    <button id="check-btn">Check this posting</button>
+    <div id="form-error" class="form-error" hidden></div>
+  </div>
+
+  <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
   <div class="cost" id="cost">$0.0000</div>
+
   <table>
     <thead>
       <tr><th>Verdict</th><th>Title</th><th>Company</th><th>Evidence</th><th>Contact</th></tr>
@@ -27,6 +98,23 @@
   </table>
 
 <script>
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function extractErrorMessage(data) {
+  if (!data) return 'Something went wrong.';
+  if (typeof data.detail === 'string') return data.detail;
+  if (Array.isArray(data.detail) && data.detail[0] && data.detail[0].msg) return data.detail[0].msg;
+  return 'Something went wrong.';
+}
+
 async function refresh() {
   const cost = await (await fetch('/cost')).json();
   document.getElementById('cost').textContent = '$' + cost.total_measured_cost_usd.toFixed(4);
@@ -37,16 +125,73 @@ async function refresh() {
   for (const r of results.reverse()) {
     const tr = document.createElement('tr');
     const icon = r.verdict === 'real' ? '✅' : r.verdict === 'suspicious' ? '⚠️' : '❌';
+    const evidenceItems = (r.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
     tr.innerHTML = `
-      <td class="badge ${r.verdict}">${icon} ${r.verdict}</td>
-      <td>${r.title || ''}</td>
-      <td>${r.company || ''}</td>
-      <td>${(r.evidence || []).join('; ')}</td>
-      <td>${r.contact ? '✓ found' : '—'}</td>
+      <td><span class="badge ${r.verdict}">${icon} ${escapeHtml(r.verdict)}</span></td>
+      <td class="title-cell">${escapeHtml(r.title)}</td>
+      <td class="company-cell">${escapeHtml(r.company)}</td>
+      <td><ul class="evidence">${evidenceItems}</ul></td>
+      <td>
+        ${r.contact ? '✓ found' : '—'}
+        ${typeof r.check_cost_usd === 'number' ? `<div class="row-cost">Cost: $${r.check_cost_usd.toFixed(4)}</div>` : ''}
+      </td>
     `;
     rows.appendChild(tr);
   }
 }
+
+const urlInput = document.getElementById('url-input');
+const companyInput = document.getElementById('company-input');
+const titleInput = document.getElementById('title-input');
+const checkBtn = document.getElementById('check-btn');
+const formError = document.getElementById('form-error');
+
+checkBtn.addEventListener('click', async () => {
+  formError.hidden = true;
+  formError.textContent = '';
+
+  const url = urlInput.value.trim();
+  const company = companyInput.value.trim();
+  const title = titleInput.value.trim();
+
+  let payload;
+  if (url) {
+    payload = { url };
+  } else if (title && company) {
+    payload = { title, company };
+  } else {
+    formError.textContent = 'Provide a URL, or both a title and a company.';
+    formError.hidden = false;
+    return;
+  }
+
+  checkBtn.disabled = true;
+  const originalLabel = checkBtn.textContent;
+  checkBtn.textContent = 'Checking…';
+
+  try {
+    const resp = await fetch('/check-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(extractErrorMessage(data));
+    }
+    urlInput.value = '';
+    companyInput.value = '';
+    titleInput.value = '';
+    await refresh();
+  } catch (err) {
+    formError.textContent = err.message;
+    formError.hidden = false;
+  } finally {
+    checkBtn.disabled = false;
+    checkBtn.textContent = originalLabel;
+  }
+});
+
 refresh();
 setInterval(refresh, 4000);
 </script>

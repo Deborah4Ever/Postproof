@@ -217,4 +217,13 @@ def check_one_posting(posting: dict) -> dict:
         contact=contact,
         failed_signals=failed_signals,
     )
+    # Real measured cost of THIS posting's check only - excludes the batch
+    # scrape (shared/amortized across every posting in a batch, not
+    # attributable to any single one) and any url-extraction fetch (that
+    # happens before this function is even called).
+    verdict["check_cost_usd"] = (
+        legitimacy.get("cost_usd", 0.0)
+        + hiring_manager.get("cost_usd", 0.0)
+        + (contact_result.get("cost_usd", 0.0) if contact_result is not None else 0.0)
+    )
     return verdict
