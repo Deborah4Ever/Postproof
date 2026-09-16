@@ -48,6 +48,7 @@
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     max-width: 720px;
@@ -77,6 +78,15 @@
   }
   .wallet-zone {
     position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .wallet-zone [hidden] {
+    display: none !important;
+  }
+  #wallet-disconnected-area {
+    display: inline-flex;
+    align-items: center;
   }
   .wallet-connect-btn {
     display: inline-flex;
@@ -111,35 +121,47 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: var(--real-bg);
-    border: 1px solid var(--real-border);
+    background: rgba(74, 222, 128, 0.08);
+    border: 1px solid rgba(74, 222, 128, 0.22);
     border-radius: 999px;
-    padding: 5px 12px;
+    padding: 3px 4px 3px 12px;
     font-size: 12px;
     font-weight: 600;
-    color: var(--real-text);
+    box-shadow: var(--card-shadow);
   }
   .wallet-dot {
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: var(--real-dot);
-    box-shadow: 0 0 6px var(--real-dot);
+    background: #34d399;
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+    flex-shrink: 0;
   }
-  .wallet-disconnect-link {
-    background: none;
-    border: none;
-    color: var(--text-quiet);
+  .wallet-status-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6ee7b7;
+    white-space: nowrap;
+    margin-right: 4px;
+  }
+  .wallet-disconnect-btn {
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    color: #fca5a5;
     font-size: 11px;
+    font-weight: 600;
     font-family: inherit;
-    text-decoration: underline;
+    border-radius: 999px;
+    padding: 3px 10px;
     cursor: pointer;
-    padding: 0;
-    margin-left: 2px;
-    transition: color 0.15s ease;
+    transition: all 0.15s ease;
+    line-height: 1.2;
+    white-space: nowrap;
   }
-  .wallet-disconnect-link:hover {
-    color: var(--ghost-text);
+  .wallet-disconnect-btn:hover {
+    background: rgba(248, 113, 113, 0.25);
+    color: #ffffff;
+    border-color: rgba(248, 113, 113, 0.45);
   }
 
   /* --- wallet popover dropdown --- */
@@ -703,8 +725,8 @@
     <div class="wallet-zone">
       <div id="wallet-connected-badge" class="wallet-connected-pill" hidden>
         <span class="wallet-dot"></span>
-        <span>Monid Connected</span>
-        <button type="button" class="wallet-disconnect-link" id="top-disconnect-btn">Disconnect</button>
+        <span class="wallet-status-text">Monid Connected</span>
+        <button type="button" class="wallet-disconnect-btn" id="top-disconnect-btn">Disconnect</button>
       </div>
       <div id="wallet-disconnected-area">
         <button type="button" class="wallet-connect-btn" id="top-connect-btn">
@@ -995,7 +1017,7 @@ function renderTrialCounter(checksUsed, cap, flashMsg) {
   const isExhausted = currentTrial.checks_used >= currentTrial.cap;
 
   if (userMonidKey) {
-    trialCounter.innerHTML = `Connected with your own Monid key <button type="button" class="disconnect-key-btn" id="disconnect-key-btn">Disconnect key</button>`;
+    trialCounter.textContent = 'Using connected Monid key (custom balance)';
     if (walletConnectedBadge) walletConnectedBadge.hidden = false;
     if (walletDisconnectedArea) walletDisconnectedArea.hidden = true;
     if (topWalletPopover) topWalletPopover.hidden = true;
@@ -1023,7 +1045,8 @@ trialCounter.addEventListener('click', (e) => {
   }
 });
 
-topConnectBtn.addEventListener('click', () => {
+topConnectBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
   const isHidden = topWalletPopover.hidden;
   topWalletPopover.hidden = !isHidden;
   if (!topWalletPopover.hidden) {
@@ -1031,11 +1054,17 @@ topConnectBtn.addEventListener('click', () => {
   }
 });
 
-topKeyCloseBtn.addEventListener('click', () => {
+topWalletPopover.addEventListener('click', (e) => {
+  e.stopPropagation();
+});
+
+topKeyCloseBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
   topWalletPopover.hidden = true;
 });
 
-topKeySubmitBtn.addEventListener('click', () => {
+topKeySubmitBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
   const key = topKeyInput.value.trim();
   if (!key) return;
   topKeyInput.value = '';
@@ -1043,8 +1072,26 @@ topKeySubmitBtn.addEventListener('click', () => {
   applyConnectedKey(key);
 });
 
-topDisconnectBtn.addEventListener('click', () => {
+topKeyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    topKeySubmitBtn.click();
+  } else if (e.key === 'Escape') {
+    topWalletPopover.hidden = true;
+  }
+});
+
+topDisconnectBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
   applyDisconnectKey();
+});
+
+document.addEventListener('click', (e) => {
+  if (topWalletPopover && !topWalletPopover.hidden) {
+    if (!topWalletPopover.contains(e.target) && !topConnectBtn.contains(e.target)) {
+      topWalletPopover.hidden = true;
+    }
+  }
 });
 
 async function loadTrialStatus() {
