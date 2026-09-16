@@ -11,7 +11,7 @@ into it. Works for both writer gigs and recruiter reqs; same pipeline.
 Nothing downstream works without these three things, in this order:
 
 1. **GitHub** — Deborah creates an empty repo under her own account
-   (e.g. `deborah-username/verified-jobs`) and adds you as a
+   (e.g. `deborah-username/Postproof`) and adds you as a
    collaborator. Don't push to a repo under your account and move it
    later — start it in the right place.
 2. **Monid key** — Deborah shares the key value directly (voice call
@@ -31,8 +31,8 @@ need to be sorted before the build is deep, not after.
 ## Phase 1 — Local setup (15-20 min)
 
 ```bash
-git clone https://github.com/<deborah-account>/verified-jobs.git
-cd verified-jobs
+git clone https://github.com/<deborah-account>/Postproof.git
+cd Postproof
 ```
 
 Unzip the scaffold into this folder (or have it already there if
