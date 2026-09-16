@@ -30,6 +30,9 @@ def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
     couldn't extract fields), returns {"failed": True, "error": ..., ...}
     instead of raising - same honest-failure pattern as the rest of this file.
     """
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "https://" + url
+
     result = call_monid_tool(TOOL_URL_EXTRACT, {"url": url}, user_key=user_key)
     if not result.success:
         return {"failed": True, "error": "could not fetch the page", "cost_usd": result.cost_usd}
@@ -40,6 +43,30 @@ def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
         return {
             "failed": True,
             "error": "page returned no usable content (blocked or empty)",
+            "cost_usd": result.cost_usd,
+        }
+
+    # Log raw content preview to console for diagnosis (first 800 chars)
+    print(f"[URL_EXTRACT] Raw content fetched for {url} (first 800 chars):\n{markdown[:800]}\n---")
+
+    # Detect pages that returned a 410/404 error page (e.g. expired Wellfound jobs)
+    meta = data.get("metadata") or {}
+    page_title = (meta.get("title") or "").lower()
+    md_head = markdown[:1500].lower()
+    if any(phrase in page_title or phrase in md_head for phrase in [
+        "page no longer available",
+        "410: page no longer available",
+        "oops! page no longer available",
+        "job is no longer available",
+        "job posting has expired",
+        "posting has expired",
+        "job has been closed",
+        "404: page not found",
+        "404 not found",
+    ]):
+        return {
+            "failed": True,
+            "error": "job posting is no longer available or has expired (source returned 410/404)",
             "cost_usd": result.cost_usd,
         }
 

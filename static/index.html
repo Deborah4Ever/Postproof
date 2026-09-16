@@ -3,142 +3,377 @@
 <head>
 <meta charset="utf-8" />
 <title>Postproof</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: dark;
-    --bg: #0b0c0f;
-    --card-bg: #15171c;
-    --card-border: #23252b;
-    --input-bg: #0f1014;
-    --input-border: #2a2d35;
-    --text: #e8e8ea;
-    --text-muted: #9ca3af;
-    --text-quiet: #6b7280;
-    --accent: #4ade80;
-    --accent-ink: #06240f;
+    --bg: #0c0d12;
+    --card-bg: #151720;
+    --card-border: rgba(255, 255, 255, 0.06);
+    --card-border-hover: rgba(255, 255, 255, 0.11);
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.25);
+    --card-shadow-hover: 0 6px 24px -2px rgba(0, 0, 0, 0.5), 0 2px 8px -1px rgba(0, 0, 0, 0.3);
 
-    /* Status washes: pale tinted background + a muted (not neon) shade of
-       the same hue for text, so nothing reads as a saturated fill. */
-    --real-bg: rgba(74, 222, 128, 0.10);
-    --real-text: #7fd99a;
-    --real-dot: #4ade80;
-    --suspicious-bg: rgba(217, 181, 98, 0.12);
-    --suspicious-text: #d9b562;
-    --suspicious-dot: #eab308;
-    --ghost-bg: rgba(240, 128, 128, 0.10);
-    --ghost-text: #e08585;
+    --input-bg: #0a0b0f;
+    --input-border: rgba(255, 255, 255, 0.09);
+    --input-border-focus: #4ade80;
+    --input-focus-shadow: 0 0 0 2px rgba(74, 222, 128, 0.18);
+
+    --text: #f1f2f6;
+    --text-muted: #94a3b8;
+    --text-quiet: #64748b;
+    --accent: #4ade80;
+    --accent-hover: #3ecc72;
+    --accent-ink: #05230c;
+
+    /* Status washes: low-opacity wash paired with a harmonious lighter tone
+       from the exact same hue family for dark-mode contrast. Never flat solid white/black text. */
+    --real-bg: rgba(74, 222, 128, 0.12);
+    --real-border: rgba(74, 222, 128, 0.22);
+    --real-text: #6ee7b7;
+    --real-dot: #34d399;
+
+    --suspicious-bg: rgba(251, 191, 36, 0.12);
+    --suspicious-border: rgba(251, 191, 36, 0.22);
+    --suspicious-text: #fcd34d;
+    --suspicious-dot: #fbbf24;
+
+    --ghost-bg: rgba(248, 113, 113, 0.12);
+    --ghost-border: rgba(248, 113, 113, 0.22);
+    --ghost-text: #fca5a5;
     --ghost-dot: #f87171;
   }
+
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    max-width: 720px; margin: 48px auto; padding: 0 16px 60px;
-    background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    max-width: 720px;
+    margin: 48px auto;
+    padding: 0 16px 64px;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Title reads as a quiet wordmark, not a headline - the cost number
-     below is the thing your eye should land on. */
+  /* Title reads as a quiet wordmark */
   h1 {
-    font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--text-quiet); margin: 0 0 32px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-quiet);
+    margin: 0 0 32px;
   }
 
-  .zone { margin-bottom: 48px; }
-  .zone:last-child { margin-bottom: 0; }
+  .zone {
+    margin-bottom: 40px;
+  }
+  .zone:last-child {
+    margin-bottom: 0;
+  }
 
   .section-label {
-    color: var(--text-quiet); font-size: 12px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.06em; margin-bottom: 10px;
+    color: var(--text-quiet);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
   }
 
-  /* --- check form: a distinctly raised card, separated from the page --- */
+  /* --- check form: elevated surface card --- */
   .check-form {
-    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px;
-    padding: 24px; margin-bottom: 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 12px;
+    box-shadow: var(--card-shadow);
   }
   .check-form input {
-    width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text);
-    border-radius: 8px; padding: 12px 14px; font-size: 15px; font-family: inherit;
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    outline: none;
   }
-  .check-form input::placeholder { color: var(--text-quiet); }
-  #url-input { margin-bottom: 12px; }
-  .fields-row { display: flex; gap: 10px; margin-bottom: 14px; }
-  .fields-row input { font-size: 13px; padding: 9px 12px; }
+  .check-form input:focus {
+    border-color: var(--input-border-focus);
+    box-shadow: var(--input-focus-shadow);
+  }
+  .check-form input::placeholder {
+    color: var(--text-quiet);
+  }
+  #url-input {
+    margin-bottom: 12px;
+  }
+  .fields-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .fields-row input {
+    font-size: 13px;
+    padding: 10px 14px;
+  }
   .check-form button {
-    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
-    padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, opacity 0.15s ease, transform 0.05s ease;
   }
-  .check-form button:disabled { opacity: 0.6; cursor: default; }
+  .check-form button:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  .check-form button:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+  .check-form button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
   .form-error {
-    margin-top: 12px; color: var(--ghost-text); font-size: 13px; background: var(--ghost-bg);
-    border: 1px solid rgba(240,128,128,0.3); border-radius: 8px; padding: 10px 12px;
+    margin-top: 14px;
+    color: var(--ghost-text);
+    font-size: 13px;
+    background: var(--ghost-bg);
+    border: 1px solid var(--ghost-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    line-height: 1.4;
   }
 
   /* --- trial counter + key gate --- */
-  .trial-counter { color: var(--text-quiet); font-size: 12px; }
+  .trial-counter {
+    color: var(--text-quiet);
+    font-size: 12px;
+    font-weight: 500;
+    padding-left: 4px;
+    display: flex;
+    align-items: center;
+  }
+  .disconnect-key-btn {
+    background: none;
+    border: none;
+    color: var(--text-quiet);
+    font-size: 11px;
+    font-weight: 500;
+    font-family: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-left: 6px;
+    padding: 0;
+    transition: color 0.15s ease;
+  }
+  .disconnect-key-btn:hover {
+    color: var(--ghost-text);
+  }
   .trial-gate {
-    margin-top: 12px; background: var(--suspicious-bg);
-    border: 1px solid rgba(217,181,98,0.3); border-radius: 8px; padding: 14px;
+    margin-top: 16px;
+    background: var(--suspicious-bg);
+    border: 1px solid var(--suspicious-border);
+    border-radius: 10px;
+    padding: 16px;
   }
-  .trial-gate-msg { color: var(--suspicious-text); font-size: 13px; margin-bottom: 10px; }
-  .trial-gate input { margin-bottom: 10px; }
+  .trial-gate-msg {
+    color: var(--suspicious-text);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    line-height: 1.4;
+  }
+  .trial-gate input {
+    margin-bottom: 12px;
+  }
   .trial-gate button {
-    background: var(--suspicious-dot); color: #241d02; border: none; border-radius: 8px;
-    padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
+    background: var(--suspicious-dot);
+    color: #241d02;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s ease;
   }
-  .trial-gate button:disabled { opacity: 0.6; cursor: default; }
+  .trial-gate button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 
-  /* --- cost number: the single largest, boldest element on the page --- */
+  /* --- cost number: the clear visual hero --- */
   .cost-label {
-    color: var(--text-quiet); font-size: 12px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.06em; margin-bottom: 6px;
+    color: var(--text-quiet);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
   }
   .cost {
-    font-size: 40px; font-weight: 500; color: var(--accent); letter-spacing: -0.01em;
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
     font-variant-numeric: tabular-nums;
   }
 
-  /* --- results: one compact row per posting, detail on demand --- */
-  .results-list { display: flex; flex-direction: column; gap: 10px; }
-  .results-empty { color: var(--text-quiet); font-size: 13px; }
+  /* --- results: elevated card rows --- */
+  .results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .results-empty {
+    color: var(--text-quiet);
+    font-size: 13px;
+    padding: 16px 0;
+  }
 
   .result-row {
-    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px;
-    padding: 14px 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--card-shadow);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  .result-main { display: flex; align-items: flex-start; gap: 12px; }
-  .result-body { flex: 1 1 auto; min-width: 0; }
-  .result-title { font-weight: 600; font-size: 14px; }
-  .result-company { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
-  .result-summary { font-size: 12px; color: var(--text-quiet); margin-top: 6px; line-height: 1.4; }
+  .result-row:hover {
+    border-color: var(--card-border-hover);
+    box-shadow: var(--card-shadow-hover);
+  }
+  .result-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .result-body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .result-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.35;
+  }
+  .result-company {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .result-summary {
+    font-size: 12px;
+    color: var(--text-quiet);
+    margin-top: 6px;
+    line-height: 1.45;
+  }
 
   .result-toggle {
-    flex: 0 0 auto; background: none; border: none; color: var(--text-quiet);
-    font-size: 12px; cursor: pointer; padding: 2px 4px; font-family: inherit;
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    color: var(--text-quiet);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 6px;
+    font-family: inherit;
+    border-radius: 4px;
+    transition: color 0.15s ease;
   }
-  .result-toggle:hover { color: var(--text-muted); }
+  .result-toggle:hover {
+    color: var(--text);
+  }
 
   .result-details {
-    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--card-border);
   }
-  .result-details[hidden] { display: none; }
-  .evidence { margin: 0; padding-left: 18px; }
-  .evidence li { margin-bottom: 4px; line-height: 1.4; color: #c7c9cf; font-size: 13px; }
-  .evidence li:last-child { margin-bottom: 0; }
-  .detail-contact { margin-top: 8px; font-size: 12px; color: var(--text-quiet); }
+  .result-details[hidden] {
+    display: none;
+  }
+  .evidence {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .evidence li {
+    margin-bottom: 6px;
+    line-height: 1.45;
+    color: #cbd5e1;
+    font-size: 13px;
+  }
+  .evidence li:last-child {
+    margin-bottom: 0;
+  }
+  .detail-contact {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-quiet);
+  }
 
+  /* --- verdict pill badges --- */
   .badge {
-    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
-    border-radius: 999px; font-weight: 600; font-size: 12px; white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
     margin-top: 1px;
+    border: 1px solid transparent;
   }
-  .badge .dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
-  .badge.real { background: var(--real-bg); color: var(--real-text); }
-  .badge.real .dot { background: var(--real-dot); }
-  .badge.suspicious { background: var(--suspicious-bg); color: var(--suspicious-text); }
-  .badge.suspicious .dot { background: var(--suspicious-dot); }
-  .badge.ghost { background: var(--ghost-bg); color: var(--ghost-text); }
-  .badge.ghost .dot { background: var(--ghost-dot); }
+  .badge .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+  .badge.real {
+    background: var(--real-bg);
+    color: var(--real-text);
+    border-color: var(--real-border);
+  }
+  .badge.real .dot {
+    background: var(--real-dot);
+  }
+  .badge.suspicious {
+    background: var(--suspicious-bg);
+    color: var(--suspicious-text);
+    border-color: var(--suspicious-border);
+  }
+  .badge.suspicious .dot {
+    background: var(--suspicious-dot);
+  }
+  .badge.ghost {
+    background: var(--ghost-bg);
+    color: var(--ghost-text);
+    border-color: var(--ghost-border);
+  }
+  .badge.ghost .dot {
+    background: var(--ghost-dot);
+  }
 </style>
 </head>
 <body>
@@ -297,13 +532,31 @@ function requestHeaders() {
   return headers;
 }
 
-function renderTrialCounter(checksUsed, cap) {
+let currentTrial = { checks_used: 0, cap: 2 };
+
+function renderTrialCounter(checksUsed, cap, flashMsg) {
+  if (checksUsed !== undefined && cap !== undefined) {
+    currentTrial = { checks_used: checksUsed, cap: cap };
+  }
   if (userMonidKey) {
-    trialCounter.textContent = 'Connected with your own Monid key';
+    trialCounter.innerHTML = `Connected with your own Monid key <button type="button" class="disconnect-key-btn" id="disconnect-key-btn">Disconnect key</button>`;
   } else {
-    trialCounter.textContent = `${checksUsed} of ${cap} free checks used`;
+    const mainText = `${currentTrial.checks_used} of ${currentTrial.cap} free checks used`;
+    trialCounter.textContent = flashMsg ? `${flashMsg} (${mainText})` : mainText;
   }
 }
+
+trialCounter.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'disconnect-key-btn') {
+    userMonidKey = null;
+    if (currentTrial.checks_used >= currentTrial.cap) {
+      showTrialGate('Free trial used up (2 checks) - connect your own Monid key to continue');
+    } else {
+      hideTrialGate();
+    }
+    renderTrialCounter(currentTrial.checks_used, currentTrial.cap, 'Key removed.');
+  }
+});
 
 async function loadTrialStatus() {
   try {
@@ -392,7 +645,7 @@ continueKeyBtn.addEventListener('click', async () => {
   userMonidKey = key;
   userKeyInput.value = '';
   hideTrialGate();
-  renderTrialCounter(0, 2);
+  renderTrialCounter(currentTrial.checks_used, currentTrial.cap);
   if (lastPayload) {
     await submitCheck(lastPayload);
   }
