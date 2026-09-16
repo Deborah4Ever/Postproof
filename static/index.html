@@ -59,14 +59,162 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Title reads as a quiet wordmark */
-  h1 {
+  /* --- top nav header --- */
+  .top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 0 32px;
+    position: relative;
+  }
+  .top-nav h1 {
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-quiet);
-    margin: 0 0 32px;
+    margin: 0;
+  }
+  .wallet-zone {
+    position: relative;
+  }
+  .wallet-connect-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+    transition: all 0.15s ease;
+  }
+  .wallet-connect-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .wallet-connect-btn.exhausted {
+    background: var(--suspicious-bg);
+    border-color: var(--suspicious-border);
+    color: var(--suspicious-text);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.2);
+  }
+  .wallet-bolt {
+    font-size: 12px;
+  }
+  .wallet-connected-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--real-bg);
+    border: 1px solid var(--real-border);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--real-text);
+  }
+  .wallet-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--real-dot);
+    box-shadow: 0 0 6px var(--real-dot);
+  }
+  .wallet-disconnect-link {
+    background: none;
+    border: none;
+    color: var(--text-quiet);
+    font-size: 11px;
+    font-family: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 2px;
+    transition: color 0.15s ease;
+  }
+  .wallet-disconnect-link:hover {
+    color: var(--ghost-text);
+  }
+
+  /* --- wallet popover dropdown --- */
+  .wallet-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 310px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    z-index: 50;
+  }
+  .popover-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .popover-desc {
+    font-size: 11px;
+    color: var(--text-quiet);
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+  .wallet-popover input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    margin-bottom: 12px;
+    outline: none;
+  }
+  .wallet-popover input:focus {
+    border-color: var(--accent);
+    box-shadow: var(--input-focus-shadow);
+  }
+  .popover-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .popover-submit-btn {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease;
+  }
+  .popover-submit-btn:hover {
+    background: var(--accent-hover);
+  }
+  .popover-close-btn {
+    background: none;
+    border: 1px solid var(--card-border);
+    color: var(--text-quiet);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .popover-close-btn:hover {
+    color: var(--text);
   }
 
   .zone {
@@ -550,7 +698,31 @@
 </style>
 </head>
 <body>
-  <h1>Postproof</h1>
+  <header class="top-nav">
+    <h1>Postproof</h1>
+    <div class="wallet-zone">
+      <div id="wallet-connected-badge" class="wallet-connected-pill" hidden>
+        <span class="wallet-dot"></span>
+        <span>Monid Connected</span>
+        <button type="button" class="wallet-disconnect-link" id="top-disconnect-btn">Disconnect</button>
+      </div>
+      <div id="wallet-disconnected-area">
+        <button type="button" class="wallet-connect-btn" id="top-connect-btn">
+          <span class="wallet-bolt">⚡</span>
+          <span id="top-connect-label">Connect Monid Key</span>
+        </button>
+      </div>
+      <div class="wallet-popover" id="top-wallet-popover" hidden>
+        <div class="popover-title">Connect Monid Wallet / Key</div>
+        <div class="popover-desc">Required once the 2 free checks are exhausted. Connect anytime to use your own Monid balance directly.</div>
+        <input type="password" id="top-key-input" placeholder="Paste your Monid API key (monid_live_...)" autocomplete="off" />
+        <div class="popover-actions">
+          <button type="button" class="popover-submit-btn" id="top-key-submit-btn">Connect Key</button>
+          <button type="button" class="popover-close-btn" id="top-key-close-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </header>
 
   <div class="zone">
     <div class="check-form">
@@ -786,28 +958,93 @@ function requestHeaders() {
 
 let currentTrial = { checks_used: 0, cap: 2 };
 
+const walletConnectedBadge = document.getElementById('wallet-connected-badge');
+const walletDisconnectedArea = document.getElementById('wallet-disconnected-area');
+const topConnectBtn = document.getElementById('top-connect-btn');
+const topConnectLabel = document.getElementById('top-connect-label');
+const topWalletPopover = document.getElementById('top-wallet-popover');
+const topKeyInput = document.getElementById('top-key-input');
+const topKeySubmitBtn = document.getElementById('top-key-submit-btn');
+const topKeyCloseBtn = document.getElementById('top-key-close-btn');
+const topDisconnectBtn = document.getElementById('top-disconnect-btn');
+
+function applyConnectedKey(key) {
+  if (!key) return;
+  userMonidKey = key;
+  hideTrialGate();
+  renderTrialCounter(currentTrial.checks_used, currentTrial.cap);
+  if (lastPayload) {
+    submitCheck(lastPayload);
+  }
+}
+
+function applyDisconnectKey() {
+  userMonidKey = null;
+  if (currentTrial.checks_used >= currentTrial.cap) {
+    showTrialGate('Free trial used up (2 checks) - connect your own Monid key to continue');
+  } else {
+    hideTrialGate();
+  }
+  renderTrialCounter(currentTrial.checks_used, currentTrial.cap, 'Key removed.');
+}
+
 function renderTrialCounter(checksUsed, cap, flashMsg) {
   if (checksUsed !== undefined && cap !== undefined) {
     currentTrial = { checks_used: checksUsed, cap: cap };
   }
+  const isExhausted = currentTrial.checks_used >= currentTrial.cap;
+
   if (userMonidKey) {
     trialCounter.innerHTML = `Connected with your own Monid key <button type="button" class="disconnect-key-btn" id="disconnect-key-btn">Disconnect key</button>`;
+    if (walletConnectedBadge) walletConnectedBadge.hidden = false;
+    if (walletDisconnectedArea) walletDisconnectedArea.hidden = true;
+    if (topWalletPopover) topWalletPopover.hidden = true;
   } else {
     const mainText = `${currentTrial.checks_used} of ${currentTrial.cap} free checks used`;
     trialCounter.textContent = flashMsg ? `${flashMsg} (${mainText})` : mainText;
+    if (walletConnectedBadge) walletConnectedBadge.hidden = true;
+    if (walletDisconnectedArea) walletDisconnectedArea.hidden = false;
+
+    if (topConnectBtn) {
+      if (isExhausted) {
+        topConnectBtn.classList.add('exhausted');
+        topConnectLabel.textContent = 'Connect Monid Key (Exhausted)';
+      } else {
+        topConnectBtn.classList.remove('exhausted');
+        topConnectLabel.textContent = 'Connect Monid Key';
+      }
+    }
   }
 }
 
 trialCounter.addEventListener('click', (e) => {
   if (e.target && e.target.id === 'disconnect-key-btn') {
-    userMonidKey = null;
-    if (currentTrial.checks_used >= currentTrial.cap) {
-      showTrialGate('Free trial used up (2 checks) - connect your own Monid key to continue');
-    } else {
-      hideTrialGate();
-    }
-    renderTrialCounter(currentTrial.checks_used, currentTrial.cap, 'Key removed.');
+    applyDisconnectKey();
   }
+});
+
+topConnectBtn.addEventListener('click', () => {
+  const isHidden = topWalletPopover.hidden;
+  topWalletPopover.hidden = !isHidden;
+  if (!topWalletPopover.hidden) {
+    topKeyInput.focus();
+  }
+});
+
+topKeyCloseBtn.addEventListener('click', () => {
+  topWalletPopover.hidden = true;
+});
+
+topKeySubmitBtn.addEventListener('click', () => {
+  const key = topKeyInput.value.trim();
+  if (!key) return;
+  topKeyInput.value = '';
+  topWalletPopover.hidden = true;
+  applyConnectedKey(key);
+});
+
+topDisconnectBtn.addEventListener('click', () => {
+  applyDisconnectKey();
 });
 
 async function loadTrialStatus() {
@@ -894,13 +1131,8 @@ checkBtn.addEventListener('click', async () => {
 continueKeyBtn.addEventListener('click', async () => {
   const key = userKeyInput.value.trim();
   if (!key) return;
-  userMonidKey = key;
   userKeyInput.value = '';
-  hideTrialGate();
-  renderTrialCounter(currentTrial.checks_used, currentTrial.cap);
-  if (lastPayload) {
-    await submitCheck(lastPayload);
-  }
+  applyConnectedKey(key);
 });
 
 loadTrialStatus();
