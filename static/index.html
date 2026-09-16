@@ -36,6 +36,24 @@
     border: 1px solid rgba(248,113,113,0.25); border-radius: 8px; padding: 10px 12px;
   }
 
+  /* --- trial counter + key gate --- */
+  .trial-counter {
+    color: #9ca3af; font-size: 12px; margin: 10px 0 20px;
+  }
+  .trial-gate {
+    margin-top: 12px; background: rgba(250,204,21,0.08);
+    border: 1px solid rgba(250,204,21,0.3); border-radius: 8px; padding: 14px;
+  }
+  .trial-gate-msg { color: #facc15; font-size: 13px; margin-bottom: 10px; }
+  .trial-gate input {
+    margin-bottom: 10px;
+  }
+  .trial-gate button {
+    background: #facc15; color: #241d02; border: none; border-radius: 8px;
+    padding: 10px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .trial-gate button:disabled { opacity: 0.6; cursor: default; }
+
   /* --- cost counter --- */
   .cost-label {
     color: #9ca3af; font-size: 12px; font-weight: 600; text-transform: uppercase;
@@ -85,7 +103,14 @@
     </div>
     <button id="check-btn">Check this posting</button>
     <div id="form-error" class="form-error" hidden></div>
+    <div id="trial-gate" class="trial-gate" hidden>
+      <div class="trial-gate-msg" id="trial-gate-msg">Free trial used up (2 checks) - connect your own Monid key to continue</div>
+      <input id="user-key-input" type="password" placeholder="Connect your Monid API key to continue" />
+      <button id="continue-key-btn">Continue with my key</button>
+    </div>
   </div>
+
+  <div class="trial-counter" id="trial-counter"></div>
 
   <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
   <div class="cost" id="cost">$0.0000</div>
@@ -145,11 +170,120 @@ const companyInput = document.getElementById('company-input');
 const titleInput = document.getElementById('title-input');
 const checkBtn = document.getElementById('check-btn');
 const formError = document.getElementById('form-error');
+const trialCounter = document.getElementById('trial-counter');
+const trialGate = document.getElementById('trial-gate');
+const trialGateMsg = document.getElementById('trial-gate-msg');
+const userKeyInput = document.getElementById('user-key-input');
+const continueKeyBtn = document.getElementById('continue-key-btn');
 
-checkBtn.addEventListener('click', async () => {
+// In-memory only for this page session - NEVER written to localStorage,
+// sessionStorage, or any persistent storage. A shared/public machine
+// would otherwise keep the visitor's key around after they leave.
+let userMonidKey = null;
+let lastPayload = null;
+
+function requestHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (userMonidKey) headers['X-User-Monid-Key'] = userMonidKey;
+  return headers;
+}
+
+function renderTrialCounter(checksUsed, cap) {
+  if (userMonidKey) {
+    trialCounter.textContent = 'Connected with your own Monid key';
+  } else {
+    trialCounter.textContent = `${checksUsed} of ${cap} free checks used`;
+  }
+}
+
+async function loadTrialStatus() {
+  try {
+    const status = await (await fetch('/trial-status')).json();
+    renderTrialCounter(status.checks_used, status.cap);
+  } catch (err) {
+    // non-fatal - counter just stays blank
+  }
+}
+
+function showTrialGate(message) {
+  if (message) trialGateMsg.textContent = message;
+  trialGate.hidden = false;
+  checkBtn.hidden = true;
+}
+
+function hideTrialGate() {
+  trialGate.hidden = true;
+  checkBtn.hidden = false;
+}
+
+async function refresh() {
+  const cost = await (await fetch('/cost')).json();
+  document.getElementById('cost').textContent = '$' + cost.total_measured_cost_usd.toFixed(4);
+
+  const results = await (await fetch('/results')).json();
+  const rows = document.getElementById('rows');
+  rows.innerHTML = '';
+  for (const r of results.reverse()) {
+    const tr = document.createElement('tr');
+    const icon = r.verdict === 'real' ? '✅' : r.verdict === 'suspicious' ? '⚠️' : '❌';
+    const evidenceItems = (r.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
+    tr.innerHTML = `
+      <td><span class="badge ${r.verdict}">${icon} ${escapeHtml(r.verdict)}</span></td>
+      <td class="title-cell">${escapeHtml(r.title)}</td>
+      <td class="company-cell">${escapeHtml(r.company)}</td>
+      <td><ul class="evidence">${evidenceItems}</ul></td>
+      <td>
+        ${r.contact ? '✓ found' : '—'}
+        ${typeof r.check_cost_usd === 'number' ? `<div class="row-cost">Cost: $${r.check_cost_usd.toFixed(4)}</div>` : ''}
+      </td>
+    `;
+    rows.appendChild(tr);
+  }
+}
+
+async function submitCheck(payload) {
   formError.hidden = true;
   formError.textContent = '';
 
+  checkBtn.disabled = true;
+  const originalLabel = checkBtn.textContent;
+  checkBtn.textContent = 'Checking…';
+
+  try {
+    const resp = await fetch('/check-job', {
+      method: 'POST',
+      headers: requestHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+
+    if (resp.status === 402 && data.error === 'trial_exhausted') {
+      lastPayload = payload;
+      showTrialGate(data.message);
+      renderTrialCounter(data.checks_used, 2);
+      return;
+    }
+    if (!resp.ok) {
+      throw new Error(extractErrorMessage(data));
+    }
+
+    hideTrialGate();
+    if (data.trial) renderTrialCounter(data.trial.checks_used, data.trial.cap);
+    urlInput.value = '';
+    companyInput.value = '';
+    titleInput.value = '';
+    lastPayload = null;
+    await refresh();
+  } catch (err) {
+    formError.textContent = err.message;
+    formError.hidden = false;
+  } finally {
+    checkBtn.disabled = false;
+    checkBtn.textContent = originalLabel;
+  }
+}
+
+checkBtn.addEventListener('click', async () => {
   const url = urlInput.value.trim();
   const company = companyInput.value.trim();
   const title = titleInput.value.trim();
@@ -165,33 +299,22 @@ checkBtn.addEventListener('click', async () => {
     return;
   }
 
-  checkBtn.disabled = true;
-  const originalLabel = checkBtn.textContent;
-  checkBtn.textContent = 'Checking…';
+  await submitCheck(payload);
+});
 
-  try {
-    const resp = await fetch('/check-job', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      throw new Error(extractErrorMessage(data));
-    }
-    urlInput.value = '';
-    companyInput.value = '';
-    titleInput.value = '';
-    await refresh();
-  } catch (err) {
-    formError.textContent = err.message;
-    formError.hidden = false;
-  } finally {
-    checkBtn.disabled = false;
-    checkBtn.textContent = originalLabel;
+continueKeyBtn.addEventListener('click', async () => {
+  const key = userKeyInput.value.trim();
+  if (!key) return;
+  userMonidKey = key;
+  userKeyInput.value = '';
+  hideTrialGate();
+  renderTrialCounter(0, 2);
+  if (lastPayload) {
+    await submitCheck(lastPayload);
   }
 });
 
+loadTrialStatus();
 refresh();
 setInterval(refresh, 4000);
 </script>

@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 receipts/ledger.jsonl
 receipts/results.jsonl
+receipts/trials.json

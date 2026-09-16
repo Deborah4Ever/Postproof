@@ -17,7 +17,7 @@ from .monid_client import (
 from .verdict import synthesize_verdict, extract_posting_fields
 
 
-def extract_posting_from_url(url: str) -> dict:
+def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
     """
     Fetches a job posting page's content via Monid and asks Claude to pull
     the structured fields out of it - pages vary too much in structure
@@ -30,7 +30,7 @@ def extract_posting_from_url(url: str) -> dict:
     couldn't extract fields), returns {"failed": True, "error": ..., ...}
     instead of raising - same honest-failure pattern as the rest of this file.
     """
-    result = call_monid_tool(TOOL_URL_EXTRACT, {"url": url})
+    result = call_monid_tool(TOOL_URL_EXTRACT, {"url": url}, user_key=user_key)
     if not result.success:
         return {"failed": True, "error": "could not fetch the page", "cost_usd": result.cost_usd}
 
@@ -60,7 +60,7 @@ def extract_posting_from_url(url: str) -> dict:
     }
 
 
-def scrape_postings(role: str, location: str, limit: int = 20) -> list[dict]:
+def scrape_postings(role: str, location: str, limit: int = 20, user_key: str | None = None) -> list[dict]:
     # Map common search terms to Wellfound's role slug taxonomy
     role_slug = role.lower().strip().replace(" ", "-")
     slug_map = {
@@ -75,6 +75,7 @@ def scrape_postings(role: str, location: str, limit: int = 20) -> list[dict]:
     result = call_monid_tool(
         TOOL_JOB_SCRAPE,
         {"role": role_slug, "location": loc_slug},
+        user_key=user_key,
     )
     data = result.data
     raw_jobs = []
@@ -165,11 +166,12 @@ def freshness_description(posting: dict) -> str:
     return "posted over a month ago"
 
 
-def check_company_legitimacy(company_name: str) -> dict:
+def check_company_legitimacy(company_name: str, user_key: str | None = None) -> dict:
     result = call_monid_tool(
         TOOL_COMPANY_SEARCH,
         # surf /search/web query param is 'q', not 'query'
         {"q": f"{company_name} company news careers hiring"},
+        user_key=user_key,
     )
     if not result.success:
         return {"evidence": None, "failed": True, "cost_usd": result.cost_usd}
@@ -177,12 +179,13 @@ def check_company_legitimacy(company_name: str) -> dict:
     return {"evidence": result.data, "failed": False, "cost_usd": result.cost_usd}
 
 
-def check_hiring_manager_exists(company_name: str, role_title: str) -> dict:
+def check_hiring_manager_exists(company_name: str, role_title: str, user_key: str | None = None) -> dict:
     result = call_monid_tool(
         TOOL_PEOPLE_SEARCH,
         # apollo /mixed_people/api_search: 'q_keywords' is the free-text filter;
         # person_titles[] would be ideal but q_keywords works as a broad match.
         {"q_keywords": f"{role_title} {company_name}"},
+        user_key=user_key,
     )
     if not result.success:
         return {"found": False, "raw": None, "failed": True, "cost_usd": result.cost_usd}
@@ -191,7 +194,7 @@ def check_hiring_manager_exists(company_name: str, role_title: str) -> dict:
     return {"found": bool(people), "raw": result.data, "failed": False, "cost_usd": result.cost_usd}
 
 
-def enrich_contact(person_name: str, company_name: str) -> dict | None:
+def enrich_contact(person_name: str, company_name: str, user_key: str | None = None) -> dict | None:
     """
     Only call this AFTER a posting has passed the legitimacy check.
     This is the expensive step (~$0.05/call) - don't spend it on
@@ -208,24 +211,28 @@ def enrich_contact(person_name: str, company_name: str) -> dict | None:
         TOOL_ENRICHMENT,
         # apollo /people/match: 'organization_name' not 'company'
         {"name": person_name, "organization_name": company_name},
+        user_key=user_key,
     )
     if not result.success:
         return {"data": None, "failed": True, "cost_usd": result.cost_usd}
     return {"data": result.data, "failed": False, "cost_usd": result.cost_usd}
 
 
-def check_one_posting(posting: dict) -> dict:
+def check_one_posting(posting: dict, user_key: str | None = None) -> dict:
     """
     Runs the full chain for a single posting and returns a verdict record.
     This is the function your API route and your batch script both call.
+
+    user_key: caller-supplied Monid key (from X-User-Monid-Key), forwarded
+    to every Monid call this posting makes instead of the server's key.
     """
     company = posting.get("company", "")
     title = posting.get("title", "")
 
     freshness = freshness_description(posting)
     posting_age = _posting_age(posting)
-    legitimacy = check_company_legitimacy(company)
-    hiring_manager = check_hiring_manager_exists(company, title)
+    legitimacy = check_company_legitimacy(company, user_key=user_key)
+    hiring_manager = check_hiring_manager_exists(company, title, user_key=user_key)
 
     contact = None
     contact_result = None
@@ -246,7 +253,7 @@ def check_one_posting(posting: dict) -> dict:
             first_person.get("first_name", ""),
             first_person.get("last_name_obfuscated", ""),
         ])).strip()
-        contact_result = enrich_contact(person_name, company)
+        contact_result = enrich_contact(person_name, company, user_key=user_key)
         if contact_result is not None and not contact_result["failed"]:
             contact = contact_result["data"]
 

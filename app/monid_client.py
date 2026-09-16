@@ -76,11 +76,19 @@ def _poll_until_done(run_id: str, max_wait: int = 120) -> dict:
     raise TimeoutError(f"Monid run {run_id} still RUNNING after {max_wait}s")
 
 
-def call_monid_tool(tool_id: str, params: dict) -> MonidCallResult:
+def call_monid_tool(tool_id: str, params: dict, user_key: str | None = None) -> MonidCallResult:
     """
     Calls a Monid tool and returns the result plus the REAL measured cost
     Monid reports for that call. Never estimate cost - always read it from
     the response.
+
+    user_key: an optional caller-supplied Monid key (from the
+    X-User-Monid-Key request header) that overrides MONID_API_KEY for THIS
+    call only. Passed as a per-request header override on the shared
+    httpx.Client, not a global/env swap - so concurrent requests on the
+    server key are never affected by another request's user key. Never
+    persisted: log_receipt only ever records which key SOURCE was used
+    ("user_key" vs "server_key"), never the key value itself.
 
     Real Monid HTTP API (confirmed via docs + live call 2026-09-15):
       POST /v1/run
@@ -118,12 +126,19 @@ def call_monid_tool(tool_id: str, params: dict) -> MonidCallResult:
     """
     provider, endpoint = _parse_tool_id(tool_id)
     run_id = None
+    source = "user_key" if user_key else "server_key"
+    # Per-request header override - httpx merges this over the client's
+    # default Authorization header for this call only, so the shared
+    # _client instance (and every other concurrent request on the server
+    # key) is never mutated.
+    request_headers = {"Authorization": f"Bearer {user_key}"} if user_key else None
     try:
         # Confirmed via live test 2026-09-15: all four endpoints use queryParams,
         # not 'input'. Using 'input: {q: ...}' caused 400 "received undefined".
         resp = _client.post(
             "/run",
             json={"provider": provider, "endpoint": endpoint, "queryParams": params},
+            headers=request_headers,
         )
         resp.raise_for_status()  # 200 sync, 202 async-accepted are both OK; raises on 4xx/5xx
         body = resp.json()
@@ -139,7 +154,7 @@ def call_monid_tool(tool_id: str, params: dict) -> MonidCallResult:
         cost = _extract_cost(body)
         data = body.get("output", body)                     # payload is under "output"
 
-        log_receipt(tool=tool_id, params=params, cost_usd=cost, run_id=run_id, status="completed")
+        log_receipt(tool=tool_id, params=params, cost_usd=cost, run_id=run_id, status="completed", source=source)
         return MonidCallResult(tool=tool_id, data=data, cost_usd=cost, run_id=run_id, success=True)
     except Exception as exc:
         # Monid sometimes bills a run that started and then failed, so pull
@@ -158,7 +173,7 @@ def call_monid_tool(tool_id: str, params: dict) -> MonidCallResult:
             run_id = error_body.get("runId") or run_id
             cost = _extract_cost(error_body)
 
-        log_receipt(tool=tool_id, params=params, cost_usd=cost, run_id=run_id, status="failed")
+        log_receipt(tool=tool_id, params=params, cost_usd=cost, run_id=run_id, status="failed", source=source)
         return MonidCallResult(tool=tool_id, data={}, cost_usd=cost, run_id=run_id, success=False)
 
 
@@ -175,9 +190,12 @@ def _extract_cost(body: dict) -> float:
     return micro_dollars / 1_000_000                      # shape A: micro-USD -> USD
 
 
-def log_receipt(tool: str, params: dict, cost_usd: float, run_id: str | None, status: str):
+def log_receipt(tool: str, params: dict, cost_usd: float, run_id: str | None, status: str, source: str = "server_key"):
     import json
 
+    # NEVER log the key value itself - only which key SOURCE was used.
+    # `params` is safe to log as-is; the key is never part of `params`,
+    # it only ever travels as a per-request header (see call_monid_tool).
     receipts_path = os.environ.get("RECEIPTS_PATH", "receipts/ledger.jsonl")
     os.makedirs(os.path.dirname(receipts_path) or ".", exist_ok=True)
     line = {
@@ -186,6 +204,7 @@ def log_receipt(tool: str, params: dict, cost_usd: float, run_id: str | None, st
         "run_id": run_id,
         "cost_usd": cost_usd,
         "status": status,
+        "source": source,
     }
     with open(receipts_path, "a") as f:
         f.write(json.dumps(line) + "\n")
