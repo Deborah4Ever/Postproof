@@ -10,6 +10,63 @@ import anthropic
 
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
+EXTRACT_FIELDS_PROMPT = """You are extracting structured job posting fields from raw page \
+content fetched from {url}. The page may include site navigation, "similar jobs" sections, \
+cookie banners, and other noise alongside the actual posting - ignore anything that isn't part \
+of THIS specific job posting.
+
+Page content:
+{content}
+
+Respond with ONLY valid JSON, no other text:
+{{
+  "found_posting": <true if this page contains an actual single job posting, false if it's a \
+blocked/error page, a listing/search page, or otherwise has no posting to extract>,
+  "title": <string, the job title, or null>,
+  "company": <string, the hiring company's name, or null>,
+  "description": <string, the job description/responsibilities/requirements text for this \
+posting, trimmed to at most 1500 characters of the essential content (drop boilerplate EEO/\
+benefits/legal text), or null>,
+  "posted_at": <ISO 8601 date string if a specific post date is stated on the page, else null - \
+do not guess>
+}}
+"""
+
+
+def extract_posting_fields(page_content: str, url: str) -> dict | None:
+    """
+    Asks Claude to pull {title, company, description, posted_at} out of raw
+    scraped page content. Job posting pages vary too much in structure across
+    sites for reliable regex/CSS-selector scraping, so the model reads it
+    instead. Returns None if the page had no extractable posting or the
+    model's response couldn't be parsed - never raises, so one bad page
+    can't crash the request; the caller turns None into an honest failure.
+    """
+    prompt = EXTRACT_FIELDS_PROMPT.format(url=url, content=page_content[:8000])
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=2048,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    text = response.content[0].text.strip()
+    if text.startswith("```"):
+        text = text.split("```", 2)[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.rsplit("```", 1)[0].strip()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+    if not parsed.get("found_posting") or not parsed.get("title"):
+        return None
+
+    return parsed
+
+
 VERDICT_PROMPT = """You are checking whether a job posting is real or a "ghost job" \
 (posted but never intended to be filled - common for data harvesting, pipeline-building, \
 or fake openings that make a company look like it's growing).

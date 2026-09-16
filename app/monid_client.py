@@ -31,6 +31,11 @@ TOOL_COMPANY_SEARCH = "surf:/search/web"
 TOOL_PEOPLE_SEARCH = "apollo:/mixed_people/api_search"
 # Contact enrichment: Apollo people match — $0.05/call, stable 1.9s
 TOOL_ENRICHMENT = "apollo:/people/match"
+# URL-to-content for the /check-job url path: Context.dev markdown scrape —
+# JS rendering, anti-bot bypass, and proxies included server-side, so this
+# works on JS-heavy boards (LinkedIn/Wellfound), not just static pages.
+# $0.0009/call, healthy, confirmed via live call 2026-09-15.
+TOOL_URL_EXTRACT = "context.dev:/web/scrape/markdown"
 
 _client = httpx.Client(
     base_url=MONID_BASE_URL,

@@ -9,11 +9,17 @@ signals instead of relying on the board's own listing.
 ## Endpoints
 
 ### POST /check-job
-Check a single posting. Send:
+Check a single posting. Send EITHER a link to the live posting:
+```json
+{ "url": "string - a LinkedIn/Indeed/careers-page link to the posting" }
+```
+OR the fields directly:
 ```json
 { "title": "string", "company": "string", "description": "string (optional)", "posted_at": "ISO 8601 date (optional)" }
 ```
-Returns:
+When `url` is given, the page is fetched and its fields (title, company,
+description, posted_at) are extracted automatically - the other fields are
+ignored in that case. Returns the same verdict shape either way:
 ```json
 {
   "title": "string",
@@ -25,6 +31,8 @@ Returns:
   "contact": { "...": "verified contact info, or null" }
 }
 ```
+If `url` extraction fails (page blocked, no job content found), returns a
+422 with an `error` detail instead of a verdict.
 
 ### POST /run-batch?role=...&location=...&limit=...
 Scrapes fresh postings matching role/location and checks each one
@@ -41,10 +49,10 @@ Returns every verdict recorded so far, most recent last.
 ## MCP
 
 Also available as an MCP server at /mcp, exposing one tool:
-check_job_posting(title, company, description, posted_at) -> same
-shape as POST /check-job. Point any MCP client (Claude, Cursor, or
-another agent) at this URL + /mcp to call it directly, no separate
-integration code required.
+check_job_posting(url, title, company, description, posted_at) -> same
+shape as POST /check-job, accepting the same url-or-fields choice. Point
+any MCP client (Claude, Cursor, or another agent) at this URL + /mcp to
+call it directly, no separate integration code required.
 
 ## What this is not
 

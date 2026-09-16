@@ -7,7 +7,7 @@ endpoint uses - no separate logic to keep in sync.
 
 from mcp.server.fastmcp import FastMCP
 
-from .pipeline import check_one_posting
+from .pipeline import check_one_posting, extract_posting_from_url
 
 mcp = FastMCP(
     name="postproof",
@@ -23,28 +23,46 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-def check_job_posting(title: str, company: str, description: str = "", posted_at: str = "") -> dict:
+def check_job_posting(
+    url: str = "",
+    title: str = "",
+    company: str = "",
+    description: str = "",
+    posted_at: str = "",
+) -> dict:
     """
     Check whether a job posting is real or a likely ghost job.
 
+    Provide EITHER `url` (a link to the live posting - LinkedIn, Indeed, a
+    company careers page, etc.) OR both `title` and `company` typed
+    directly. If `url` is given, the page is fetched and its fields are
+    extracted automatically; the other fields are ignored in that case.
+
     Args:
-        title: The job title as posted.
-        company: The company name as posted.
-        description: The full posting text, if available.
-        posted_at: ISO 8601 date the posting went live, if known.
+        url: A link to the live job posting, if you have one.
+        title: The job title as posted (required if url is not given).
+        company: The company name as posted (required if url is not given).
+        description: The full posting text, if available (ignored if url is given).
+        posted_at: ISO 8601 date the posting went live, if known (ignored if url is given).
 
     Returns:
         A dict with verdict ("real" | "suspicious" | "ghost"), a
         confidence score, cited evidence, a ready-to-use pitch line
         (or null if the verdict is "ghost"), and contact info if a
-        verified hiring manager was found.
+        verified hiring manager was found. If url extraction fails,
+        returns {"error": "..."} instead of a verdict.
     """
-    posting = {
-        "title": title,
-        "company": company,
-        "description": description,
-        "posted_at": posted_at or None,
-    }
+    if url:
+        posting = extract_posting_from_url(url)
+        if posting.get("failed"):
+            return {"error": f"could not extract job posting from URL: {posting['error']}"}
+    else:
+        posting = {
+            "title": title,
+            "company": company,
+            "description": description,
+            "posted_at": posted_at or None,
+        }
     return check_one_posting(posting)
 
 

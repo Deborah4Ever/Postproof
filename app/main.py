@@ -4,9 +4,9 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
-from .pipeline import scrape_postings, check_one_posting
+from .pipeline import scrape_postings, check_one_posting, extract_posting_from_url
 from .monid_client import total_measured_cost
 from .mcp_server import mcp_app
 
@@ -21,10 +21,17 @@ RESULTS_PATH = "receipts/results.jsonl"
 
 
 class CheckJobRequest(BaseModel):
-    title: str
-    company: str
+    url: str | None = None
+    title: str | None = None
+    company: str | None = None
     description: str = ""
     posted_at: str | None = None
+
+    @model_validator(mode="after")
+    def require_url_or_fields(self):
+        if not self.url and not (self.title and self.company):
+            raise ValueError("Provide either 'url', or both 'title' and 'company'.")
+        return self
 
 
 @app.post("/check-job")
@@ -33,9 +40,22 @@ def check_job(req: CheckJobRequest):
     The one clean endpoint - anyone (or any agent) can POST a single
     posting here and get a verdict back. This is the piece worth
     exposing beyond just your own UI.
+
+    Accepts either a `url` to the live posting (fetched and extracted
+    automatically) or the structured fields directly, unchanged from before.
     """
+    if req.url:
+        posting = extract_posting_from_url(req.url)
+        if posting.get("failed"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"could not extract job posting from URL: {posting['error']}",
+            )
+    else:
+        posting = req.model_dump(exclude={"url"})
+
     try:
-        verdict = check_one_posting(req.model_dump())
+        verdict = check_one_posting(posting)
     except Exception as e:
         # Do NOT let one bad posting 500 silently - the guide explicitly
         # requires demoing failure handling, not just the happy path.

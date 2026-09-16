@@ -12,8 +12,52 @@ from .monid_client import (
     TOOL_COMPANY_SEARCH,
     TOOL_PEOPLE_SEARCH,
     TOOL_ENRICHMENT,
+    TOOL_URL_EXTRACT,
 )
-from .verdict import synthesize_verdict
+from .verdict import synthesize_verdict, extract_posting_fields
+
+
+def extract_posting_from_url(url: str) -> dict:
+    """
+    Fetches a job posting page's content via Monid and asks Claude to pull
+    the structured fields out of it - pages vary too much in structure
+    across LinkedIn/Indeed/careers-site layouts for regex/CSS-selector
+    scraping to be reliable.
+
+    Returns the same shape check_one_posting() expects as its posting
+    argument on success: {title, company, description, posted_at, url}.
+    On any failure (fetch error, blocked page, no posting content, model
+    couldn't extract fields), returns {"failed": True, "error": ..., ...}
+    instead of raising - same honest-failure pattern as the rest of this file.
+    """
+    result = call_monid_tool(TOOL_URL_EXTRACT, {"url": url})
+    if not result.success:
+        return {"failed": True, "error": "could not fetch the page", "cost_usd": result.cost_usd}
+
+    data = result.data or {}
+    markdown = data.get("markdown")
+    if not data.get("success") or not markdown:
+        return {
+            "failed": True,
+            "error": "page returned no usable content (blocked or empty)",
+            "cost_usd": result.cost_usd,
+        }
+
+    fields = extract_posting_fields(markdown, url)
+    if fields is None:
+        return {
+            "failed": True,
+            "error": "no job posting found in the page content",
+            "cost_usd": result.cost_usd,
+        }
+
+    return {
+        "title": fields.get("title") or "",
+        "company": fields.get("company") or "",
+        "description": fields.get("description") or "",
+        "posted_at": fields.get("posted_at"),
+        "url": url,
+    }
 
 
 def scrape_postings(role: str, location: str, limit: int = 20) -> list[dict]:
