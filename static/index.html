@@ -545,7 +545,7 @@
     background: var(--ghost-dot);
   }
 
-  /* --- cost header row with calls badge --- */
+  /* --- cost header row with clickable calls badge --- */
   .cost-header-row {
     display: flex;
     justify-content: space-between;
@@ -556,15 +556,85 @@
     margin-bottom: 0;
   }
   .calls-counter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 11px;
     font-weight: 600;
     color: var(--accent);
     background: var(--real-bg);
     border: 1px solid var(--real-border);
     border-radius: 999px;
-    padding: 3px 10px;
-    letter-spacing: 0.04em;
+    padding: 4px 12px;
+    letter-spacing: 0.03em;
     font-variant-numeric: tabular-nums;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .calls-counter-badge:hover {
+    background: rgba(74, 222, 128, 0.22);
+    border-color: rgba(74, 222, 128, 0.45);
+    color: #86efac;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(74, 222, 128, 0.15);
+  }
+  .calls-counter-badge:active {
+    transform: translateY(0);
+  }
+  .calls-counter-badge.active {
+    background: rgba(74, 222, 128, 0.25);
+    border-color: #4ade80;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.25);
+  }
+  .calls-badge-hint {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+
+  /* --- cost breakdown drawer --- */
+  .cost-breakdown-drawer {
+    margin-top: 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--card-shadow);
+  }
+  .cost-breakdown-drawer[hidden] {
+    display: none !important;
+  }
+  .breakdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .breakdown-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .breakdown-close-btn {
+    background: none;
+    border: 1px solid var(--card-border);
+    color: var(--text-quiet);
+    font-size: 11px;
+    font-family: inherit;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .breakdown-close-btn:hover {
+    color: var(--text);
+    border-color: var(--card-border-hover);
   }
 
   /* --- itemized calls in result details --- */
@@ -767,24 +837,24 @@
   <div class="zone">
     <div class="cost-header-row">
       <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
-      <div class="calls-counter-badge" id="cost-calls">0 API calls</div>
+      <button type="button" class="calls-counter-badge" id="cost-calls" aria-expanded="false" title="Click to view API call breakdown">
+        <span id="cost-calls-text">0 API calls</span>
+        <span class="calls-badge-hint" id="cost-calls-hint">· View receipts ▾</span>
+      </button>
     </div>
     <div class="cost" id="cost">$0.0000</div>
+    <div id="cost-breakdown-drawer" class="cost-breakdown-drawer" hidden>
+      <div class="breakdown-header">
+        <div class="breakdown-title">Itemized Monid API Call Receipts (<span id="drawer-count">0</span> calls)</div>
+        <button type="button" class="breakdown-close-btn" id="drawer-close-btn">Close</button>
+      </div>
+      <div class="ledger-list" id="drawer-ledger-list"></div>
+    </div>
   </div>
 
   <div class="zone">
     <div class="section-label">Recent checks</div>
     <div class="results-list" id="rows"></div>
-  </div>
-
-  <div class="zone">
-    <div class="section-label-row">
-      <div class="section-label">Call Receipts Ledger</div>
-      <button class="ledger-toggle-btn" id="ledger-toggle-btn" type="button" aria-expanded="false">View receipts (<span id="ledger-count">0</span> calls)</button>
-    </div>
-    <div id="ledger-container" class="ledger-container" hidden>
-      <div class="ledger-list" id="ledger-list"></div>
-    </div>
   </div>
 
 <script>
@@ -837,12 +907,36 @@ function capitalize(str) {
 // restore that state - otherwise an open detail panel would slam shut
 // every 4 seconds mid-read.
 const expandedRows = new Set();
-let isLedgerOpen = false;
+let isCallsDrawerOpen = false;
+let currentTotalCalls = 0;
+
+function updateCallsBadge(totalCalls) {
+  if (totalCalls !== undefined && totalCalls !== null) {
+    currentTotalCalls = totalCalls;
+  }
+  const badge = document.getElementById('cost-calls');
+  const text = document.getElementById('cost-calls-text');
+  const hint = document.getElementById('cost-calls-hint');
+  if (text) text.textContent = `${currentTotalCalls} API call${currentTotalCalls === 1 ? '' : 's'}`;
+  if (hint) hint.textContent = isCallsDrawerOpen ? '· Hide receipts ▴' : '· View receipts ▾';
+  if (badge) {
+    badge.setAttribute('aria-expanded', String(isCallsDrawerOpen));
+    if (isCallsDrawerOpen) badge.classList.add('active');
+    else badge.classList.remove('active');
+  }
+}
+
+function toggleCallsDrawer(forceState) {
+  isCallsDrawerOpen = typeof forceState === 'boolean' ? forceState : !isCallsDrawerOpen;
+  const drawer = document.getElementById('cost-breakdown-drawer');
+  if (drawer) drawer.hidden = !isCallsDrawerOpen;
+  updateCallsBadge();
+}
 
 async function refresh() {
   const cost = await (await fetch('/cost')).json();
   document.getElementById('cost').textContent = '$' + Number(cost.total_measured_cost_usd || 0).toFixed(4);
-  document.getElementById('cost-calls').textContent = `${cost.total_calls || 0} API calls`;
+  updateCallsBadge(cost.total_calls || 0);
 
   const results = await (await fetch('/results')).json();
   const rows = document.getElementById('rows');
@@ -902,30 +996,33 @@ async function refresh() {
 
   try {
     const receiptsData = await (await fetch('/receipts')).json();
-    document.getElementById('ledger-count').textContent = receiptsData.total_calls || 0;
-    const ledgerList = document.getElementById('ledger-list');
-    if (receiptsData.receipts && receiptsData.receipts.length > 0) {
-      ledgerList.innerHTML = receiptsData.receipts.map(rc => {
-        const costStr = '$' + Number(rc.cost_usd || 0).toFixed(4);
-        const timeStr = rc.ts ? new Date(rc.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
-        const runIdShort = rc.run_id ? rc.run_id.slice(-8) : '—';
-        return `
-          <div class="ledger-item">
-            <div class="ledger-item-left">
-              <span class="ledger-tool-name">${escapeHtml(rc.tool)}</span>
-              <span class="ledger-source">${escapeHtml(rc.source || 'server_key')}</span>
+    const drawerCount = document.getElementById('drawer-count');
+    if (drawerCount) drawerCount.textContent = receiptsData.total_calls || 0;
+    const drawerList = document.getElementById('drawer-ledger-list');
+    if (drawerList) {
+      if (receiptsData.receipts && receiptsData.receipts.length > 0) {
+        drawerList.innerHTML = receiptsData.receipts.map(rc => {
+          const costStr = '$' + Number(rc.cost_usd || 0).toFixed(4);
+          const timeStr = rc.ts ? new Date(rc.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+          const runIdShort = rc.run_id ? rc.run_id.slice(-8) : '—';
+          return `
+            <div class="ledger-item">
+              <div class="ledger-item-left">
+                <span class="ledger-tool-name">${escapeHtml(rc.tool)}</span>
+                <span class="ledger-source">${escapeHtml(rc.source || 'server_key')}</span>
+              </div>
+              <div class="ledger-item-right">
+                <span class="call-cost">${costStr}</span>
+                <span class="call-status ${escapeHtml(rc.status || 'completed')}">${escapeHtml(rc.status || 'completed')}</span>
+                <span class="call-runid" title="${escapeHtml(rc.run_id || '')}">${escapeHtml(runIdShort)}</span>
+                <span class="ledger-time">${escapeHtml(timeStr)}</span>
+              </div>
             </div>
-            <div class="ledger-item-right">
-              <span class="call-cost">${costStr}</span>
-              <span class="call-status ${escapeHtml(rc.status || 'completed')}">${escapeHtml(rc.status || 'completed')}</span>
-              <span class="call-runid" title="${escapeHtml(rc.run_id || '')}">${escapeHtml(runIdShort)}</span>
-              <span class="ledger-time">${escapeHtml(timeStr)}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    } else {
-      ledgerList.innerHTML = '<div class="results-empty">No receipts recorded yet.</div>';
+          `;
+        }).join('');
+      } else {
+        drawerList.innerHTML = '<div class="results-empty">No receipts recorded yet.</div>';
+      }
     }
   } catch (err) {
     // non-fatal
@@ -945,15 +1042,16 @@ document.getElementById('rows').addEventListener('click', (e) => {
   if (willOpen) expandedRows.add(key); else expandedRows.delete(key);
 });
 
-document.getElementById('ledger-toggle-btn').addEventListener('click', () => {
-  const container = document.getElementById('ledger-container');
-  const btn = document.getElementById('ledger-toggle-btn');
-  isLedgerOpen = !isLedgerOpen;
-  container.hidden = !isLedgerOpen;
-  btn.setAttribute('aria-expanded', String(isLedgerOpen));
-  const count = document.getElementById('ledger-count').textContent;
-  btn.textContent = isLedgerOpen ? 'Hide receipts' : `View receipts (${count} calls)`;
+document.getElementById('cost-calls').addEventListener('click', () => {
+  toggleCallsDrawer();
 });
+
+const drawerCloseBtn = document.getElementById('drawer-close-btn');
+if (drawerCloseBtn) {
+  drawerCloseBtn.addEventListener('click', () => {
+    toggleCallsDrawer(false);
+  });
+}
 
 const urlInput = document.getElementById('url-input');
 const companyInput = document.getElementById('company-input');
