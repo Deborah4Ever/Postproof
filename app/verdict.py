@@ -77,15 +77,19 @@ Company: {company}
 Description: {description}
 
 Signals gathered:
-- Posted within the last 14 days: {fresh}
+- Freshness: {freshness}
 - A named hiring manager was found for this role at this company: {hiring_manager_found}
 - Company web/social activity evidence: {legitimacy_evidence}
 - Verified contact enrichment succeeded: {contact_found}
 
-Weigh these signals against each other - do not just count them. A company with strong \
-general web presence but zero specific evidence tied to THIS role, posted a long time ago, \
-with no named hiring manager, is a stronger "ghost" signal than a fresh posting missing only \
-one weak signal.
+Weigh these signals against each other - do not just count them. Freshness is a gradient, not \
+a single bucket: a posting from a few hours or 1-2 days ago is a meaningfully stronger positive \
+signal than one from 10-13 days ago, even though a flat cutoff would call both "recent" - do \
+not collapse that difference into one bucket. A company with strong general web presence but \
+zero specific evidence tied to THIS role, posted a long time ago, with no named hiring manager, \
+is a stronger "ghost" signal than a very recently posted listing missing only one weak signal. \
+An unknown posting date is a neutral-to-cautionary signal, not a positive one - do not treat it \
+as equivalent to a fresh posting.
 
 Respond with ONLY valid JSON, no other text:
 {{
@@ -107,7 +111,7 @@ FAILURE_MESSAGES = {
 
 def synthesize_verdict(
     posting: dict,
-    fresh: bool,
+    freshness: str,
     legitimacy_evidence,
     hiring_manager_found: bool,
     contact: dict | None,
@@ -118,7 +122,7 @@ def synthesize_verdict(
         title=posting.get("title", ""),
         company=posting.get("company", ""),
         description=posting.get("description", "")[:1000],
-        fresh=fresh,
+        freshness=freshness,
         hiring_manager_found=hiring_manager_found,
         legitimacy_evidence=json.dumps(legitimacy_evidence)[:1500],
         contact_found=contact is not None,
@@ -164,6 +168,8 @@ def synthesize_verdict(
     evidence = list(parsed["evidence"])
     for signal in failed_signals:
         evidence.append(FAILURE_MESSAGES.get(signal, f"{signal} unavailable - source returned an error"))
+    if freshness == "posting date unknown":
+        evidence.append("posting date could not be determined")
 
     return {
         "title": posting.get("title"),

@@ -4,7 +4,7 @@ filter, which is pure logic - don't spend money checking staleness,
 that's free to compute from the scraped date.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .monid_client import (
     call_monid_tool,
@@ -98,25 +98,71 @@ def scrape_postings(role: str, location: str, limit: int = 20) -> list[dict]:
             or startup.get("name")
             or "Unknown Company"
         )
+        # Wellfound's real field is liveStartAt (Unix seconds) - it has no
+        # posted_at/created_at field at all, so those two never matched and
+        # every scraped posting silently got posted_at=None until now.
+        live_start_at = job.get("liveStartAt")
+        posted_at = job.get("posted_at") or job.get("created_at")
+        if not posted_at and live_start_at:
+            try:
+                posted_at = datetime.fromtimestamp(live_start_at, tz=timezone.utc).isoformat()
+            except (TypeError, ValueError, OSError):
+                posted_at = None
+
         postings.append({
             "title": job.get("title", role),
             "company": company,
             "description": job.get("description") or job.get("snippet") or f"{job.get('title', role)} at {company}",
-            "posted_at": job.get("posted_at") or job.get("created_at"),
+            "posted_at": posted_at,
             "url": job.get("url") or (f"https://wellfound.com/jobs/{job.get('id')}" if job.get("id") else None),
         })
     return postings
 
 
-def is_fresh(posting: dict, max_age_days: int = 14) -> bool:
+def _posting_age(posting: dict) -> timedelta | None:
+    """
+    Age of the posting as a timedelta, or None if posted_at is missing or
+    unparseable. Shared by freshness_description() and the enrichment
+    cost-gate so both agree on what "unknown" means - an unknown date is
+    NOT treated as fresh in either place, it's a neutral/cautionary gap,
+    not a default assumption of freshness.
+    """
     posted_at = posting.get("posted_at")
     if not posted_at:
-        return True  # unknown age - let it through, flag it downstream instead of dropping it
+        return None
     try:
         posted_dt = datetime.fromisoformat(posted_at.replace("Z", "+00:00"))
     except ValueError:
-        return True
-    return (datetime.now(posted_dt.tzinfo) - posted_dt) <= timedelta(days=max_age_days)
+        return None
+    if posted_dt.tzinfo is None:
+        posted_dt = posted_dt.replace(tzinfo=timezone.utc)
+    return datetime.now(posted_dt.tzinfo) - posted_dt
+
+
+def freshness_description(posting: dict) -> str:
+    """
+    Human-readable relative freshness signal for the verdict prompt, e.g.
+    "posted 6 hours ago" or "posted 13 days ago" - a flat fresh/stale
+    boolean collapses the real difference in confidence between a posting
+    from a few hours ago and one from 13 days ago, so this reports the
+    actual gradient instead. Returns "posting date unknown" when posted_at
+    is missing or unparseable - never silently assumes freshness.
+    """
+    age = _posting_age(posting)
+    if age is None:
+        return "posting date unknown"
+
+    hours = age.total_seconds() / 3600
+    days = age.days
+
+    if hours < 24:
+        h = max(1, round(hours))
+        return f"posted {h} hour{'s' if h != 1 else ''} ago"
+    if days == 7:
+        return "posted about a week ago"
+    if days < 30:
+        return f"posted {days} day{'s' if days != 1 else ''} ago"
+    return "posted over a month ago"
 
 
 def check_company_legitimacy(company_name: str) -> dict:
@@ -176,7 +222,8 @@ def check_one_posting(posting: dict) -> dict:
     company = posting.get("company", "")
     title = posting.get("title", "")
 
-    fresh = is_fresh(posting)
+    freshness = freshness_description(posting)
+    posting_age = _posting_age(posting)
     legitimacy = check_company_legitimacy(company)
     hiring_manager = check_hiring_manager_exists(company, title)
 
@@ -185,8 +232,12 @@ def check_one_posting(posting: dict) -> dict:
     # SHORT-CIRCUIT: only pay for enrichment if this looks like a real,
     # fresh posting with a real hiring manager - this is the single
     # biggest cost lever in the whole pipeline (enrichment is ~half
-    # the per-check cost).
-    looks_legit_enough = fresh and hiring_manager["found"]
+    # the per-check cost). An unknown posting date does NOT qualify -
+    # same "unknown is cautionary, not positive" rule as the freshness
+    # string itself, so we don't spend the expensive call on a guess.
+    looks_legit_enough = (
+        posting_age is not None and posting_age.days <= 14 and hiring_manager["found"]
+    )
     if looks_legit_enough and (hiring_manager.get("raw") or {}).get("people"):
         first_person = hiring_manager["raw"]["people"][0]
         # Apollo people search returns first_name (last_name is obfuscated by design).
@@ -211,7 +262,7 @@ def check_one_posting(posting: dict) -> dict:
 
     verdict = synthesize_verdict(
         posting=posting,
-        fresh=fresh,
+        freshness=freshness,
         legitimacy_evidence=legitimacy["evidence"],
         hiring_manager_found=hiring_manager["found"],
         contact=contact,
