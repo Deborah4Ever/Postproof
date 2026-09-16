@@ -84,6 +84,12 @@ def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
         "description": fields.get("description") or "",
         "posted_at": fields.get("posted_at"),
         "url": url,
+        "_url_call": {
+            "tool": TOOL_URL_EXTRACT,
+            "cost_usd": result.cost_usd,
+            "run_id": result.run_id,
+            "status": "completed",
+        },
     }
 
 
@@ -201,9 +207,9 @@ def check_company_legitimacy(company_name: str, user_key: str | None = None) -> 
         user_key=user_key,
     )
     if not result.success:
-        return {"evidence": None, "failed": True, "cost_usd": result.cost_usd}
+        return {"evidence": None, "failed": True, "cost_usd": result.cost_usd, "tool": result.tool, "run_id": result.run_id}
     # surf returns output.data as a list of search result objects
-    return {"evidence": result.data, "failed": False, "cost_usd": result.cost_usd}
+    return {"evidence": result.data, "failed": False, "cost_usd": result.cost_usd, "tool": result.tool, "run_id": result.run_id}
 
 
 def check_hiring_manager_exists(company_name: str, role_title: str, user_key: str | None = None) -> dict:
@@ -215,10 +221,10 @@ def check_hiring_manager_exists(company_name: str, role_title: str, user_key: st
         user_key=user_key,
     )
     if not result.success:
-        return {"found": False, "raw": None, "failed": True, "cost_usd": result.cost_usd}
+        return {"found": False, "raw": None, "failed": True, "cost_usd": result.cost_usd, "tool": result.tool, "run_id": result.run_id}
     # apollo returns people list under output directly (result.data IS the output obj)
     people = result.data.get("people", [])
-    return {"found": bool(people), "raw": result.data, "failed": False, "cost_usd": result.cost_usd}
+    return {"found": bool(people), "raw": result.data, "failed": False, "cost_usd": result.cost_usd, "tool": result.tool, "run_id": result.run_id}
 
 
 def enrich_contact(person_name: str, company_name: str, user_key: str | None = None) -> dict | None:
@@ -241,8 +247,8 @@ def enrich_contact(person_name: str, company_name: str, user_key: str | None = N
         user_key=user_key,
     )
     if not result.success:
-        return {"data": None, "failed": True, "cost_usd": result.cost_usd}
-    return {"data": result.data, "failed": False, "cost_usd": result.cost_usd}
+        return {"data": None, "failed": True, "cost_usd": result.cost_usd, "tool": result.tool, "run_id": result.run_id}
+    return {"data": result.data, "failed": False, "cost_usd": result.cost_usd, "tool": result.tool, "run_id": result.run_id}
 
 
 def check_one_posting(posting: dict, user_key: str | None = None) -> dict:
@@ -302,13 +308,32 @@ def check_one_posting(posting: dict, user_key: str | None = None) -> dict:
         contact=contact,
         failed_signals=failed_signals,
     )
-    # Real measured cost of THIS posting's check only - excludes the batch
-    # scrape (shared/amortized across every posting in a batch, not
-    # attributable to any single one) and any url-extraction fetch (that
-    # happens before this function is even called).
-    verdict["check_cost_usd"] = (
-        legitimacy.get("cost_usd", 0.0)
-        + hiring_manager.get("cost_usd", 0.0)
-        + (contact_result.get("cost_usd", 0.0) if contact_result is not None else 0.0)
-    )
+
+    # Track every individual API call made for this specific posting
+    api_calls = []
+    if posting.get("_url_call"):
+        api_calls.append(posting["_url_call"])
+    api_calls.append({
+        "tool": legitimacy.get("tool", TOOL_COMPANY_SEARCH),
+        "cost_usd": legitimacy.get("cost_usd", 0.0),
+        "run_id": legitimacy.get("run_id"),
+        "status": "failed" if legitimacy.get("failed") else "completed",
+    })
+    api_calls.append({
+        "tool": hiring_manager.get("tool", TOOL_PEOPLE_SEARCH),
+        "cost_usd": hiring_manager.get("cost_usd", 0.0),
+        "run_id": hiring_manager.get("run_id"),
+        "status": "failed" if hiring_manager.get("failed") else "completed",
+    })
+    if contact_result is not None:
+        api_calls.append({
+            "tool": contact_result.get("tool", TOOL_ENRICHMENT),
+            "cost_usd": contact_result.get("cost_usd", 0.0),
+            "run_id": contact_result.get("run_id"),
+            "status": "failed" if contact_result.get("failed") else "completed",
+        })
+
+    verdict["api_calls"] = api_calls
+    verdict["api_calls_count"] = len(api_calls)
+    verdict["check_cost_usd"] = round(sum(c.get("cost_usd", 0.0) for c in api_calls), 4)
     return verdict

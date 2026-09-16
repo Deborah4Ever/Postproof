@@ -374,6 +374,179 @@
   .badge.ghost .dot {
     background: var(--ghost-dot);
   }
+
+  /* --- cost header row with calls badge --- */
+  .cost-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .cost-header-row .cost-label {
+    margin-bottom: 0;
+  }
+  .calls-counter-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--real-bg);
+    border: 1px solid var(--real-border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- itemized calls in result details --- */
+  .detail-calls {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--card-border);
+  }
+  .detail-calls-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-quiet);
+    margin-bottom: 8px;
+  }
+  .detail-calls-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .call-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    background: var(--input-bg);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--input-border);
+  }
+  .call-tool {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    color: #cbd5e1;
+    word-break: break-all;
+  }
+  .call-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .call-cost {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .call-status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .call-status.completed {
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.12);
+  }
+  .call-status.failed {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.12);
+  }
+  .call-runid {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 10px;
+    color: var(--text-quiet);
+  }
+
+  /* --- call receipts ledger zone --- */
+  .section-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .section-label-row .section-label {
+    margin-bottom: 0;
+  }
+  .ledger-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-quiet);
+    font-size: 11px;
+    font-weight: 500;
+    font-family: inherit;
+    border-radius: 6px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .ledger-toggle-btn:hover {
+    color: var(--text);
+    border-color: var(--card-border-hover);
+  }
+  .ledger-container {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--card-shadow);
+  }
+  .ledger-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .ledger-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  .ledger-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .ledger-item-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .ledger-tool-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+  .ledger-time {
+    color: var(--text-quiet);
+    font-size: 11px;
+  }
+  .ledger-source {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-quiet);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
 </style>
 </head>
 <body>
@@ -398,13 +571,26 @@
   </div>
 
   <div class="zone">
-    <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
+    <div class="cost-header-row">
+      <div class="cost-label">Real Monid spend so far (measured, not estimated)</div>
+      <div class="calls-counter-badge" id="cost-calls">0 API calls</div>
+    </div>
     <div class="cost" id="cost">$0.0000</div>
   </div>
 
   <div class="zone">
     <div class="section-label">Recent checks</div>
     <div class="results-list" id="rows"></div>
+  </div>
+
+  <div class="zone">
+    <div class="section-label-row">
+      <div class="section-label">Call Receipts Ledger</div>
+      <button class="ledger-toggle-btn" id="ledger-toggle-btn" type="button" aria-expanded="false">View receipts (<span id="ledger-count">0</span> calls)</button>
+    </div>
+    <div id="ledger-container" class="ledger-container" hidden>
+      <div class="ledger-list" id="ledger-list"></div>
+    </div>
   </div>
 
 <script>
@@ -435,11 +621,16 @@ function truncate(str, maxLen) {
 }
 
 function summaryLine(r) {
-  const bits = (r.evidence || []).slice(0, 2).map(e => truncate(e, 60));
+  const bits = [];
+  const calls = r.api_calls_count || (r.api_calls && r.api_calls.length);
+  if (calls) {
+    bits.push(`${calls} API call${calls === 1 ? '' : 's'}`);
+  }
   if (typeof r.check_cost_usd === 'number') {
     bits.push(`cost $${r.check_cost_usd.toFixed(4)}`);
   }
-  return bits.join(' · ');
+  const evidenceBits = (r.evidence || []).slice(0, 2).map(e => truncate(e, 50));
+  return bits.concat(evidenceBits).join(' · ');
 }
 
 function capitalize(str) {
@@ -452,10 +643,12 @@ function capitalize(str) {
 // restore that state - otherwise an open detail panel would slam shut
 // every 4 seconds mid-read.
 const expandedRows = new Set();
+let isLedgerOpen = false;
 
 async function refresh() {
   const cost = await (await fetch('/cost')).json();
-  document.getElementById('cost').textContent = '$' + cost.total_measured_cost_usd.toFixed(4);
+  document.getElementById('cost').textContent = '$' + Number(cost.total_measured_cost_usd || 0).toFixed(4);
+  document.getElementById('cost-calls').textContent = `${cost.total_calls || 0} API calls`;
 
   const results = await (await fetch('/results')).json();
   const rows = document.getElementById('rows');
@@ -463,36 +656,85 @@ async function refresh() {
 
   if (results.length === 0) {
     rows.innerHTML = '<div class="results-empty">No checks yet.</div>';
-    return;
+  } else {
+    const indexed = results.map((r, i) => ({ r, i }));
+    indexed.reverse();
+
+    for (const { r, i } of indexed) {
+      const key = String(i);
+      const isOpen = expandedRows.has(key);
+      const confidence = typeof r.confidence === 'number' ? ` · ${r.confidence.toFixed(2)}` : '';
+      const evidenceItems = (r.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
+
+      const callsMarkup = (r.api_calls && r.api_calls.length) ? `
+        <div class="detail-calls">
+          <div class="detail-calls-header">API Calls Made (${r.api_calls.length})</div>
+          <div class="detail-calls-list">
+            ${r.api_calls.map(c => `
+              <div class="call-item">
+                <span class="call-tool">${escapeHtml(c.tool)}</span>
+                <div class="call-meta">
+                  <span class="call-cost">$${Number(c.cost_usd || 0).toFixed(4)}</span>
+                  <span class="call-status ${escapeHtml(c.status || 'completed')}">${escapeHtml(c.status || 'completed')}</span>
+                  ${c.run_id ? `<span class="call-runid" title="${escapeHtml(c.run_id)}">${escapeHtml(c.run_id.slice(-8))}</span>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '';
+
+      const row = document.createElement('div');
+      row.className = 'result-row';
+      row.innerHTML = `
+        <div class="result-main">
+          <span class="badge ${r.verdict}"><span class="dot"></span>${capitalize(escapeHtml(r.verdict))}${confidence}</span>
+          <div class="result-body">
+            <div class="result-title">${escapeHtml(r.title)}</div>
+            <div class="result-company">${escapeHtml(r.company)}</div>
+            <div class="result-summary">${escapeHtml(summaryLine(r))}</div>
+          </div>
+          <button class="result-toggle" data-key="${key}" aria-expanded="${isOpen}">${isOpen ? 'Hide details' : 'Details'}</button>
+        </div>
+        <div class="result-details" ${isOpen ? '' : 'hidden'}>
+          <ul class="evidence">${evidenceItems}</ul>
+          <div class="detail-contact">${r.contact ? 'Contact found' : 'No contact found'}</div>
+          ${callsMarkup}
+        </div>
+      `;
+      rows.appendChild(row);
+    }
   }
 
-  const indexed = results.map((r, i) => ({ r, i }));
-  indexed.reverse();
-
-  for (const { r, i } of indexed) {
-    const key = String(i);
-    const isOpen = expandedRows.has(key);
-    const confidence = typeof r.confidence === 'number' ? ` · ${r.confidence.toFixed(2)}` : '';
-    const evidenceItems = (r.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
-
-    const row = document.createElement('div');
-    row.className = 'result-row';
-    row.innerHTML = `
-      <div class="result-main">
-        <span class="badge ${r.verdict}"><span class="dot"></span>${capitalize(escapeHtml(r.verdict))}${confidence}</span>
-        <div class="result-body">
-          <div class="result-title">${escapeHtml(r.title)}</div>
-          <div class="result-company">${escapeHtml(r.company)}</div>
-          <div class="result-summary">${escapeHtml(summaryLine(r))}</div>
-        </div>
-        <button class="result-toggle" data-key="${key}" aria-expanded="${isOpen}">${isOpen ? 'Hide details' : 'Details'}</button>
-      </div>
-      <div class="result-details" ${isOpen ? '' : 'hidden'}>
-        <ul class="evidence">${evidenceItems}</ul>
-        <div class="detail-contact">${r.contact ? 'Contact found' : 'No contact found'}</div>
-      </div>
-    `;
-    rows.appendChild(row);
+  try {
+    const receiptsData = await (await fetch('/receipts')).json();
+    document.getElementById('ledger-count').textContent = receiptsData.total_calls || 0;
+    const ledgerList = document.getElementById('ledger-list');
+    if (receiptsData.receipts && receiptsData.receipts.length > 0) {
+      ledgerList.innerHTML = receiptsData.receipts.map(rc => {
+        const costStr = '$' + Number(rc.cost_usd || 0).toFixed(4);
+        const timeStr = rc.ts ? new Date(rc.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+        const runIdShort = rc.run_id ? rc.run_id.slice(-8) : '—';
+        return `
+          <div class="ledger-item">
+            <div class="ledger-item-left">
+              <span class="ledger-tool-name">${escapeHtml(rc.tool)}</span>
+              <span class="ledger-source">${escapeHtml(rc.source || 'server_key')}</span>
+            </div>
+            <div class="ledger-item-right">
+              <span class="call-cost">${costStr}</span>
+              <span class="call-status ${escapeHtml(rc.status || 'completed')}">${escapeHtml(rc.status || 'completed')}</span>
+              <span class="call-runid" title="${escapeHtml(rc.run_id || '')}">${escapeHtml(runIdShort)}</span>
+              <span class="ledger-time">${escapeHtml(timeStr)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      ledgerList.innerHTML = '<div class="results-empty">No receipts recorded yet.</div>';
+    }
+  } catch (err) {
+    // non-fatal
   }
 }
 
@@ -507,6 +749,16 @@ document.getElementById('rows').addEventListener('click', (e) => {
   btn.setAttribute('aria-expanded', String(willOpen));
   btn.textContent = willOpen ? 'Hide details' : 'Details';
   if (willOpen) expandedRows.add(key); else expandedRows.delete(key);
+});
+
+document.getElementById('ledger-toggle-btn').addEventListener('click', () => {
+  const container = document.getElementById('ledger-container');
+  const btn = document.getElementById('ledger-toggle-btn');
+  isLedgerOpen = !isLedgerOpen;
+  container.hidden = !isLedgerOpen;
+  btn.setAttribute('aria-expanded', String(isLedgerOpen));
+  const count = document.getElementById('ledger-count').textContent;
+  btn.textContent = isLedgerOpen ? 'Hide receipts' : `View receipts (${count} calls)`;
 });
 
 const urlInput = document.getElementById('url-input');

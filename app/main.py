@@ -186,7 +186,33 @@ def trial_status(request: Request, response: Response):
 
 @app.get("/cost")
 def cost():
-    return {"total_measured_cost_usd": round(total_measured_cost(), 4)}
+    receipts_path = os.environ.get("RECEIPTS_PATH", "receipts/ledger.jsonl")
+    total_calls = 0
+    if os.path.exists(receipts_path):
+        with open(receipts_path) as f:
+            total_calls = sum(1 for line in f if line.strip())
+    return {
+        "total_measured_cost_usd": round(total_measured_cost(), 4),
+        "total_calls": total_calls,
+    }
+
+
+@app.get("/receipts")
+def receipts(limit: int = 50):
+    receipts_path = os.environ.get("RECEIPTS_PATH", "receipts/ledger.jsonl")
+    if not os.path.exists(receipts_path):
+        return {"total_calls": 0, "total_cost_usd": 0.0, "receipts": []}
+    rows = []
+    with open(receipts_path) as f:
+        for line in f:
+            if line.strip():
+                rows.append(json.loads(line))
+    total_cost = sum(r.get("cost_usd", 0.0) for r in rows)
+    return {
+        "total_calls": len(rows),
+        "total_cost_usd": round(total_cost, 4),
+        "receipts": list(reversed(rows))[:limit],
+    }
 
 
 @app.get("/results")
