@@ -10,7 +10,7 @@ from .pipeline import scrape_postings, check_one_posting
 from .monid_client import total_measured_cost
 from .mcp_server import mcp_app
 
-app = FastAPI(title="Verified Jobs Feed")
+app = FastAPI(title="Postproof")
 
 # Same pattern as the Financial Datasets clone: REST and MCP are two
 # doors into the same pipeline, served from one process. Any MCP

@@ -1,4 +1,4 @@
-# Verified Jobs Feed
+# Postproof
 
 Checks whether a job posting - and the hiring manager behind it - is
 real, before you spend a pitch or a placement on it. Built to replace

@@ -10,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from .pipeline import check_one_posting
 
 mcp = FastMCP(
-    name="verified-jobs",
+    name="postproof",
     instructions=(
         "Use check_job_posting to verify whether a job posting is real "
         "before applying, pitching, or placing a candidate into it. "

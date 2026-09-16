@@ -1,4 +1,4 @@
-# SOP — Verified Jobs Feed (for Deborah)
+# SOP — Postproof (for Deborah)
 
 Kills Contena's $99/mo writer job board by checking whether a posting —
 and the hiring manager behind it — is real, before pitching or placing

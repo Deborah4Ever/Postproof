@@ -1,4 +1,4 @@
-# Verified Jobs Feed
+# Postproof
 
 Checks whether a job posting - and the human behind it - is real before
 you pitch or place someone into it. Kills Contena's $99/mo writer job
@@ -80,7 +80,7 @@ read without a human writing integration code.
 - **Onboarding prompt** (paste this into any agent's chat to configure
   it, same move as Financial Datasets' "copy onboarding prompt" button):
 
-  > Use the Verified Jobs Feed at https://<your-deploy> to check whether
+  > Use Postproof at https://<your-deploy> to check whether
   > a job posting is real before applying, pitching, or placing someone
   > into it. Call POST /check-job with {title, company, description}, or
   > connect via MCP at /mcp using the check_job_posting tool. Full API
