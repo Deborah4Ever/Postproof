@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Verified Jobs Feed</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; background: #0b0c0f; color: #e8e8ea; }
+  h1 { font-size: 20px; }
+  .cost { font-size: 32px; font-weight: 700; color: #4ade80; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #23252b; font-size: 14px; }
+  .real { color: #4ade80; }
+  .suspicious { color: #facc15; }
+  .ghost { color: #f87171; }
+  .badge { font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Verified Jobs Feed</h1>
+  <div>Real Monid spend so far (measured, not estimated):</div>
+  <div class="cost" id="cost">$0.0000</div>
+  <table>
+    <thead>
+      <tr><th>Verdict</th><th>Title</th><th>Company</th><th>Evidence</th><th>Contact</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+<script>
+async function refresh() {
+  const cost = await (await fetch('/cost')).json();
+  document.getElementById('cost').textContent = '$' + cost.total_measured_cost_usd.toFixed(4);
+
+  const results = await (await fetch('/results')).json();
+  const rows = document.getElementById('rows');
+  rows.innerHTML = '';
+  for (const r of results.reverse()) {
+    const tr = document.createElement('tr');
+    const icon = r.verdict === 'real' ? '✅' : r.verdict === 'suspicious' ? '⚠️' : '❌';
+    tr.innerHTML = `
+      <td class="badge ${r.verdict}">${icon} ${r.verdict}</td>
+      <td>${r.title || ''}</td>
+      <td>${r.company || ''}</td>
+      <td>${(r.evidence || []).join('; ')}</td>
+      <td>${r.contact ? '✓ found' : '—'}</td>
+    `;
+    rows.appendChild(tr);
+  }
+}
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>

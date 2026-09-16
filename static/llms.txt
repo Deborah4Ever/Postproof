@@ -1,0 +1,54 @@
+# Verified Jobs Feed
+
+Checks whether a job posting - and the hiring manager behind it - is
+real, before you spend a pitch or a placement on it. Built to replace
+manually vetting postings on job boards that don't check legitimacy
+(e.g. Contena), using live company, hiring-manager, and posting-age
+signals instead of relying on the board's own listing.
+
+## Endpoints
+
+### POST /check-job
+Check a single posting. Send:
+```json
+{ "title": "string", "company": "string", "description": "string (optional)", "posted_at": "ISO 8601 date (optional)" }
+```
+Returns:
+```json
+{
+  "title": "string",
+  "company": "string",
+  "verdict": "real | suspicious | ghost",
+  "confidence": 0.0-1.0,
+  "evidence": ["short strings citing the specific signals"],
+  "pitch_line": "string or null",
+  "contact": { "...": "verified contact info, or null" }
+}
+```
+
+### POST /run-batch?role=...&location=...&limit=...
+Scrapes fresh postings matching role/location and checks each one
+through the same pipeline as /check-job. Returns the full batch of
+verdicts plus total_cost_usd, the real measured Monid spend for the run.
+
+### GET /cost
+Returns total_measured_cost_usd - a running total of real provider
+costs incurred, read from a receipts ledger, not estimated.
+
+### GET /results
+Returns every verdict recorded so far, most recent last.
+
+## MCP
+
+Also available as an MCP server at /mcp, exposing one tool:
+check_job_posting(title, company, description, posted_at) -> same
+shape as POST /check-job. Point any MCP client (Claude, Cursor, or
+another agent) at this URL + /mcp to call it directly, no separate
+integration code required.
+
+## What this is not
+
+Not a real-time job board aggregator with full listing coverage. Not
+affiliated with Contena or any job board named for pricing comparison.
+Verdicts are a probabilistic assessment from available signals, not a
+guarantee - always use judgment before acting on a "real" verdict.

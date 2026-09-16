@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+receipts/ledger.jsonl
+receipts/results.jsonl
