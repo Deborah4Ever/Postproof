@@ -222,3 +222,33 @@ def total_measured_cost() -> float:
             if line.strip():
                 total += json.loads(line)["cost_usd"]
     return total
+
+
+def rollback_failed_url_receipt(run_id: str | None = None):
+    """
+    If a URL extraction fails to find a valid job posting and cannot proceed,
+    remove the scrape call from the user's billable receipts so they are never
+    charged for a failed search that produced no results.
+    """
+    import json
+    receipts_path = os.environ.get("RECEIPTS_PATH", "receipts/ledger.jsonl")
+    if not os.path.exists(receipts_path):
+        return
+    lines = []
+    removed = False
+    with open(receipts_path) as f:
+        for line_str in f:
+            if not line_str.strip():
+                continue
+            item = json.loads(line_str)
+            # Remove matching run_id or the last URL extraction receipt
+            if not removed and (
+                (run_id and item.get("run_id") == run_id) or
+                (not run_id and item.get("tool") == TOOL_URL_EXTRACT)
+            ):
+                removed = True
+                continue
+            lines.append(line_str)
+    with open(receipts_path, "w") as f:
+        f.writelines(lines)
+

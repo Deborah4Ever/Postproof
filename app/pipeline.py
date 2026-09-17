@@ -4,6 +4,8 @@ filter, which is pure logic - don't spend money checking staleness,
 that's free to compute from the scraped date.
 """
 
+import re
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 from .monid_client import (
@@ -15,6 +17,81 @@ from .monid_client import (
     TOOL_URL_EXTRACT,
 )
 from .verdict import synthesize_verdict, extract_posting_fields
+
+
+def parse_fallback_from_url(url: str, meta_title: str | None = None) -> tuple[str | None, str | None]:
+    """
+    Extracts fallback company and title when page content is a client-side
+    JavaScript shell (e.g. Centene, Workday, Taleo, Phenom People), using:
+    1. The page <title> tag from scrape metadata (e.g. 'Community Relations Specialist - Centene Careers')
+    2. The URL domain and path slug (e.g. jobs.centene.com/.../community-relations-specialist)
+    """
+    company = None
+    title = None
+
+    # Step 1: Check meta_title if available
+    if meta_title:
+        clean_title = meta_title.strip()
+        for delim in [" at ", " - ", " | ", " – ", " — "]:
+            if delim in clean_title:
+                parts = clean_title.split(delim)
+                t_candidate = parts[0].strip()
+                c_candidate = parts[1].strip()
+                c_candidate = re.sub(r'(?i)\s+(careers|jobs|recruitment|employment|inc\.?|llc)$', '', c_candidate).strip()
+                if len(t_candidate) > 2 and len(c_candidate) > 1 and not t_candidate.lower().startswith(("careers", "jobs")):
+                    title = t_candidate
+                    company = c_candidate
+                    break
+
+    # Step 2: Extract/Refine from URL
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.netloc.lower()
+    if host.startswith('www.'):
+        host = host[4:]
+
+    path_segments = [s for s in parsed.path.strip('/').split('/') if s]
+
+    # Specific ATS / platform handling
+    if 'greenhouse.io' in host and path_segments:
+        company = company or path_segments[0].replace('-', ' ').title()
+    elif 'lever.co' in host and path_segments:
+        company = company or path_segments[0].replace('-', ' ').title()
+    elif 'ashbyhq.com' in host and path_segments:
+        company = company or path_segments[0].replace('-', ' ').title()
+    elif 'weworkremotely.com' in host and len(path_segments) >= 2:
+        slug = path_segments[-1]
+        parts = slug.split('-')
+        if len(parts) >= 3:
+            company = company or ' '.join(parts[:2]).title()
+            title = title or ' '.join(parts[2:]).title()
+        else:
+            title = title or slug.replace('-', ' ').title()
+    else:
+        # Subdomain patterns like jobs.centene.com, careers.stripe.com
+        parts = host.split('.')
+        if len(parts) >= 3 and parts[0] in ('jobs', 'careers', 'boards', 'apply', 'app', 'work', 'talent'):
+            company = company or parts[1].capitalize()
+        elif len(parts) >= 2 and parts[-2] not in ('com', 'org', 'co', 'net', 'io', 'ai'):
+            company = company or parts[-2].capitalize()
+
+    # If title still not found, inspect path segments from back to front
+    if not title:
+        for seg in reversed(path_segments):
+            clean = re.sub(r'^[0-9]+-?', '', seg)
+            clean = re.sub(r'-?[0-9]+$', '', clean)
+            if len(clean) == 36 and clean.count('-') == 4:
+                continue
+            if re.match(r'^[0-9a-fA-F-]+$', clean) and len(clean) > 16:
+                continue
+            if clean and not clean.isdigit() and len(clean) > 3 and clean.lower() not in (
+                'jobs', 'job', 'us', 'en', 'careers', 'positions', 'apply', 'search', 'posting'
+            ):
+                title = clean.replace('-', ' ').replace('_', ' ').title()
+                break
+
+    return company, title
 
 
 def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
@@ -35,7 +112,7 @@ def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
 
     result = call_monid_tool(TOOL_URL_EXTRACT, {"url": url}, user_key=user_key)
     if not result.success:
-        return {"failed": True, "error": "could not fetch the page", "cost_usd": result.cost_usd}
+        return {"failed": True, "error": "could not fetch the page", "cost_usd": result.cost_usd, "_url_call": {"tool": TOOL_URL_EXTRACT, "cost_usd": result.cost_usd, "run_id": result.run_id, "status": "failed"}}
 
     data = result.data or {}
     markdown = data.get("markdown")
@@ -44,6 +121,7 @@ def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
             "failed": True,
             "error": "page returned no usable content (blocked or empty)",
             "cost_usd": result.cost_usd,
+            "_url_call": {"tool": TOOL_URL_EXTRACT, "cost_usd": result.cost_usd, "run_id": result.run_id, "status": "failed"},
         }
 
     # Log raw content preview to console for diagnosis (first 800 chars)
@@ -68,15 +146,30 @@ def extract_posting_from_url(url: str, user_key: str | None = None) -> dict:
             "failed": True,
             "error": "job posting is no longer available or has expired (source returned 410/404)",
             "cost_usd": result.cost_usd,
+            "_url_call": {"tool": TOOL_URL_EXTRACT, "cost_usd": result.cost_usd, "run_id": result.run_id, "status": "failed"},
         }
 
     fields = extract_posting_fields(markdown, url)
     if fields is None:
-        return {
-            "failed": True,
-            "error": "no job posting found in the page content",
-            "cost_usd": result.cost_usd,
-        }
+        # Fallback: Many enterprise career portals (Centene, Workday, Taleo, Phenom)
+        # render job listings via client-side JavaScript, meaning the initial HTML
+        # markdown contains navigation/cookie shells. However, the page metadata
+        # and URL path/domain contain the exact company and job title slug!
+        fallback_company, fallback_title = parse_fallback_from_url(url, meta.get("title"))
+        if fallback_title:
+            fields = {
+                "title": fallback_title,
+                "company": fallback_company or "",
+                "description": markdown[:1000] if markdown else "",
+                "posted_at": None,
+            }
+        else:
+            return {
+                "failed": True,
+                "error": "no job posting found in the page content",
+                "cost_usd": result.cost_usd,
+                "_url_call": {"tool": TOOL_URL_EXTRACT, "cost_usd": result.cost_usd, "run_id": result.run_id, "status": "failed"},
+            }
 
     return {
         "title": fields.get("title") or "",

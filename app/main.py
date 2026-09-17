@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, model_validator
 
 from .pipeline import scrape_postings, check_one_posting, extract_posting_from_url
-from .monid_client import total_measured_cost
+from .monid_client import total_measured_cost, rollback_failed_url_receipt
 from .mcp_server import mcp_app
 from .trials import get_trial_count, increment_trial, TRIAL_CAP
 
@@ -88,17 +88,31 @@ def check_job(req: CheckJobRequest, request: Request, response: Response):
         try:
             posting = extract_posting_from_url(req.url, user_key=user_key)
         except Exception as e:
-            # extract_posting_from_url calls Monid (which already logs its
-            # own cost unconditionally) and then Claude to parse the page -
-            # an uncaught error in that second step must NEVER escape as a
-            # bare 500 after the Monid spend already happened. Same
-            # never-let-it-500-silently rule as check_one_posting below.
+            rollback_failed_url_receipt()
             raise HTTPException(status_code=502, detail=f"URL extraction failed: {e}")
         if posting.get("failed"):
-            raise HTTPException(
-                status_code=422,
-                detail=f"could not extract job posting from URL: {posting['error']}",
-            )
+            # If the user provided company and title directly in the form, proceed with those!
+            if req.title and req.company:
+                posting = {
+                    "title": req.title,
+                    "company": req.company,
+                    "description": "",
+                    "url": req.url,
+                    "posted_at": None,
+                }
+            else:
+                # Remove the failed scrape call from receipts so the user is never billed for an unusable extraction
+                url_call = posting.get("_url_call") or {}
+                rollback_failed_url_receipt(url_call.get("run_id"))
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"could not extract job posting from URL: {posting['error']}. Tip: You can enter Title and Company directly below.",
+                )
+        else:
+            if req.title:
+                posting["title"] = req.title
+            if req.company:
+                posting["company"] = req.company
     else:
         posting = req.model_dump(exclude={"url"})
 
