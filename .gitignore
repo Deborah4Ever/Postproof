@@ -5,3 +5,7 @@ __pycache__/
 receipts/ledger.jsonl
 receipts/results.jsonl
 receipts/trials.json
+data/
+uploads/
+*.db
+*.sqlite

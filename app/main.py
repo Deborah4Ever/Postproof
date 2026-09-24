@@ -10,12 +10,54 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, model_validator
 
+from contextlib import asynccontextmanager
 from .pipeline import scrape_postings, check_one_posting, extract_posting_from_url
 from .monid_client import total_measured_cost, rollback_failed_url_receipt
 from .mcp_server import mcp_app
 from .trials import get_trial_count, increment_trial, TRIAL_CAP
+from .api.profiles import router as profiles_router
+from .api.jobs import router as jobs_router
+from .api.applications import router as applications_router
+from .api.review_queue import router as review_queue_router
+from .api.dashboard import router as dashboard_router
+from .api.settings import router as settings_router
+from .db.session import SessionLocal
+from .services.profile_service import seed_default_profiles
+from .services.pipeline_service import get_or_create_filter_settings
+from .services.scheduler_service import start_scheduler, stop_scheduler
 
-app = FastAPI(title="Postproof")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = SessionLocal()
+    try:
+        seed_default_profiles(db)
+        get_or_create_filter_settings(db)
+    finally:
+        db.close()
+
+    # Start background scanner unless explicitly disabled in test/dev
+    if os.environ.get("DISABLE_BACKGROUND_SCANNER", "").lower() not in ("true", "1", "yes"):
+        try:
+            start_scheduler()
+        except Exception as e:
+            print(f"[Main] Warning: Could not start scheduler: {e}")
+
+    yield
+
+    try:
+        stop_scheduler()
+    except Exception:
+        pass
+
+
+app = FastAPI(title="Personal AI Job Application Agent", lifespan=lifespan)
+app.include_router(profiles_router)
+app.include_router(jobs_router)
+app.include_router(applications_router)
+app.include_router(review_queue_router)
+app.include_router(dashboard_router)
+app.include_router(settings_router)
 
 TRIAL_COOKIE_NAME = "trial_id"
 
